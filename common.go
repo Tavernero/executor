@@ -12,6 +12,26 @@ import (
 // ================================================= //
 // ================================================= //
 
+var DEBUG_FLAG = true
+
+// ================================================= //
+// ================================================= //
+
+
+// A buffered channel that we can send work requests on.
+var TaskQueue chan Task
+
+var (
+    MaxWorker       = 20  //os.Getenv("MAX_WORKERS")
+    MaxDatabaseWorker       = 20  //os.Getenv("MAX_WORKERS")
+    MaxQueue        = 5 //os.Getenv("MAX_QUEUE")
+    MaxLength int64 = 20480
+)
+
+
+// ================================================= //
+// ================================================= //
+
 var ConnectionConfiguration = "postgres://executor:totoTOTO89@641a3187-5896-49c9-af7d-d8bed8187f79.pdb.ovh.net:21684/executor"
 
 //func getConnectionString() string {
@@ -43,6 +63,14 @@ func initDb() *gorp.DbMap {
     dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
 
 
+
+    // add a table, setting the table name to 'task' and
+    // specifying that the Id property is an auto incrementing PK
+    dbmap.AddTableWithName(Task{}, "tasks").SetKeys(true, "ID")
+
+
+
+
 //        // construct a gorp DbMap setting dialect to sqlite3
 //        dbmap := &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 //        defer dbmap.Db.Close()
@@ -69,18 +97,6 @@ func initDb() *gorp.DbMap {
 
     return dbmap
 }
-
-// ================================================= //
-// ================================================= //
-
-// A buffered channel that we can send work requests on.
-var TaskQueue chan Task
-
-var (
-    MaxWorker       = 20  //os.Getenv("MAX_WORKERS")
-    MaxQueue        = 5 //os.Getenv("MAX_QUEUE")
-    MaxLength int64 = 20480
-)
 
 // ================================================= //
 // ================================================= //
@@ -138,12 +154,14 @@ type PropertyMap map[string]interface{}
 type Configuration struct {
     Function string    // Function name where work
     MaxWorkers int    // A pool of workers channels that ardde registered with the dispatcher
+    MaxDatabaseWorkers int    // A pool of workers channels that ardde registered with the dispatcher
 }
 
 // Step dispatcher object
 type DispatcherStep struct {
     ID int
     Function string
+    Index int
     Name string
     Url string
 }

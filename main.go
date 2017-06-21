@@ -10,26 +10,37 @@ import (
     "strconv"
 )
 
+// XXX : how to defer close db connections
+
+
+// XXX : getoption lib == https://golang.org/pkg/flag/
+
+
 func main() {
 
     log.Println("main start")
 
     TaskQueue = make(chan Task, MaxQueue)
 
-    configuration := Configuration{MaxWorkers:MaxWorker,Function:"create"}
+    configuration := Configuration{
+        MaxWorkers:MaxWorker,
+        MaxDatabaseWorkers:MaxDatabaseWorker,
+        Function:"create"}
 
     dispatcher := NewDispatcher(configuration)
+
     dispatcher.Run()
 
-    http.HandleFunc("/task/", postHandlerCreateTask)
 
-    err := http.ListenAndServe(":8080", nil)
-
-    if err != nil {
-        fmt.Println("starting listening for payload messages")
-    } else {
-        fmt.Errorf("an error occured while starting payload server %s", err.Error())
-    }
+//    http.HandleFunc("/task/", postHandlerCreateTask)
+//
+//    err := http.ListenAndServe(":8080", nil)
+//
+//    if err != nil {
+//        fmt.Println("starting listening for payload messages")
+//    } else {
+//        fmt.Errorf("an error occured while starting payload server %s", err.Error())
+//    }
 }
 
 

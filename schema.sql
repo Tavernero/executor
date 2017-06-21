@@ -7,8 +7,10 @@ create table "task" (
     "step" character varying(255) not null,
     "status" character varying(255) not null,
     "retry" bigint not null,
-    "arguments" jsonb not null default '{}',
-    "buffer" jsonb not null default '{}'
+--    "arguments" jsonb not null default '{}',
+--    "buffer" jsonb not null default '{}'
+    "arguments" character varying(255) not null default '{}',
+    "buffer" character varying(255) not null default '{}'
 );
 
 insert into "task" ( "function", "name", "step", "status", "retry" ) values
@@ -51,8 +53,8 @@ CREATE OR REPLACE FUNCTION notify_event() RETURNS TRIGGER AS $$
 $$ LANGUAGE plpgsql;
 
 
-CREATE TRIGGER task_event
-AFTER INSERT OR UPDATE OR DELETE ON task
+CREATE TRIGGER "task_event"
+AFTER INSERT OR UPDATE OR DELETE ON "task"
     FOR EACH ROW EXECUTE PROCEDURE notify_event();
 
 
@@ -88,11 +90,12 @@ drop table if exists "task_step" cascade;
 create table "task_step" (
     "id" bigserial primary key,
     "function" character varying(255) not null,
+    "index" int not null,
     "name" character varying(255) not null,
     "url" text not null
 );
 
-insert into "task_step" ( "function", "name", "url" ) values ( 'create', 'starting',  'https://api.com/starting'  );
-insert into "task_step" ( "function", "name", "url" ) values ( 'create', 'onServer',  'https://api.com/onServer'  );
-insert into "task_step" ( "function", "name", "url" ) values ( 'create', 'onInterne', 'https://api.com/onInterne' );
-insert into "task_step" ( "function", "name", "url" ) values ( 'create', 'ending',    'https://api.com/ending'    );
+insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 10, 'starting',  'https://api.com/starting'  );
+insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 20, 'onServer',  'https://api.com/onServer'  );
+insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 30, 'onInterne', 'https://api.com/onInterne' );
+insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 40, 'ending',    'https://api.com/ending'    );

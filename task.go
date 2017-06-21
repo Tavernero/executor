@@ -23,9 +23,9 @@ type Task struct {
 // ================================================= //
 
 // function called when we launch a task object
-func (p *Task) WorkingOn() error {
+func (t *Task) WorkingOn() error {
     randomer := rand.Intn(2000)
     time.Sleep(time.Duration(randomer) * time.Millisecond)
-    fmt.Println("work done in " + strconv.Itoa( randomer ) + " ms for '" + strconv.Itoa( p.ID ) + "'" )
+    fmt.Println("work done in " + strconv.Itoa( randomer ) + " ms for '" + strconv.Itoa( t.ID ) + "'" )
     return nil
 }
