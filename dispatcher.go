@@ -45,7 +45,7 @@ func (d *Dispatcher) Run() {
         log.Println("All task steps :")
 
         for x, p := range d.Steps {
-            log.Printf("  %d  :  %v  \n", x, p)
+            log.Printf("  %d  :  %v", x, p)
         }
 
         log.Println("===============")
@@ -57,12 +57,13 @@ func (d *Dispatcher) Run() {
         worker.Start()
     }
 
+    // launch a first read on database data task
+    go d.firstRead()
+
     // launch the listener for database events
     go d.initializeListenerAndLaunch()
 
-//    // launch the dispatch
-//    go d.dispatch()
-
+    // launch the dispatch
     d.dispatch()
 }
 

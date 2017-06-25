@@ -7,10 +7,8 @@ create table "task" (
     "step" character varying(255) not null,
     "status" character varying(255) not null,
     "retry" bigint not null,
---    "arguments" jsonb not null default '{}',
---    "buffer" jsonb not null default '{}'
-    "arguments" character varying(255) not null default '{}',
-    "buffer" character varying(255) not null default '{}'
+    "arguments" jsonb not null default '{}',
+    "buffer" jsonb not null default '{}'
 );
 
 insert into "task" ( "function", "name", "step", "status", "retry" ) values
@@ -23,28 +21,28 @@ insert into "task" ( "function", "name", "step", "status", "retry" ) values
 
 CREATE OR REPLACE FUNCTION notify_event() RETURNS TRIGGER AS $$
     DECLARE 
-        data json;
+        task json;
         notification json;
     BEGIN
-    
+
         -- Convert the old or new row to JSON, based on the kind of action.
         -- Action = DELETE?             -> OLD row
         -- Action = INSERT or UPDATE?   -> NEW row
         IF (TG_OP = 'DELETE') THEN
-            data = row_to_json(OLD);
+            task = row_to_json(OLD);
         ELSE
-            data = row_to_json(NEW);
+            task = row_to_json(NEW);
         END IF;
         
         -- Contruct the notification as a JSON string.
         notification = json_build_object(
                           'table',TG_TABLE_NAME,
                           'action', TG_OP,
-                          'data', data);
+                          'task', task);
         
                         
         -- Execute pg_notify(channel, notification)
-        PERFORM pg_notify('events',notification::text);
+        PERFORM pg_notify('events_task',notification::text);
         
         -- Result is ignored since this is an AFTER trigger
         RETURN NULL; 
@@ -54,7 +52,7 @@ $$ LANGUAGE plpgsql;
 
 
 CREATE TRIGGER "task_event"
-AFTER INSERT OR UPDATE OR DELETE ON "task"
+    AFTER INSERT OR UPDATE OR DELETE ON "task"
     FOR EACH ROW EXECUTE PROCEDURE notify_event();
 
 
@@ -95,7 +93,8 @@ create table "task_step" (
     "url" text not null
 );
 
-insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 10, 'starting',  'https://api.com/starting'  );
-insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 20, 'onServer',  'https://api.com/onServer'  );
-insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 30, 'onInterne', 'https://api.com/onInterne' );
-insert into "task_step" ( "function", "index", "name", "url" ) values ( 'create', 40, 'ending',    'https://api.com/ending'    );
+insert into "task_step" ( "function", "index", "name", "url" ) values 
+    ( 'create', 10, 'starting',  'http://localhost:8080/starting'  ),
+    ( 'create', 20, 'onServer',  'http://localhost:8080/onServer'  ),
+    ( 'create', 30, 'onInterne', 'http://localhost:8080/onInterne' ),
+    ( 'create', 40, 'ending',    'http://localhost:8080/ending'    );

@@ -11,6 +11,32 @@ import (
     "github.com/lib/pq"
 )
 
+
+
+// read all tasks from the database
+func (d *Dispatcher) firstRead() {
+
+    // retrieve all task
+    var tasks []Task
+
+    _, err := d.connector.Select(&tasks, "select * from task where status = :status order by id asc", map[string]interface{}{"status":"todo"})
+
+    if err != nil {
+        log.Fatalln("Select failed", err)
+    }
+
+    log.Println("All rows:")
+
+    for x, task := range tasks {
+        TaskQueue <- task
+
+        log.Printf("  %d : %v\n", x, task)
+    }
+}
+
+
+
+
 // prepare the listener data and launch it
 func (d *Dispatcher) initializeListenerAndLaunch() {
 
@@ -28,7 +54,7 @@ func (d *Dispatcher) initializeListenerAndLaunch() {
 
     listener := pq.NewListener(ConnectionConfiguration, 10*time.Second, time.Minute, reportProblem)
 
-    err = listener.Listen("events")
+    err = listener.Listen("events_task")
 
     if err != nil {
         panic(err)
@@ -42,10 +68,10 @@ func (d *Dispatcher) initializeListenerAndLaunch() {
 }
 
 
-type DeltaTask struct {
-    Table string
-    Action string
-    Data Task
+type DatabaseNotification struct {
+    Table   string
+    Action  string
+    Task    Task
 }
 
 // listening to the event bus of the database and do some actions
@@ -53,19 +79,25 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
     for {
         select {
             case n := <-l.Notify:
-                fmt.Println("Received data from channel [", n.Channel, "] :")
+                var notification DatabaseNotification
 
-                var task DeltaTask
-
-                err := json.Unmarshal([]byte(n.Extra), &task)
+                err := json.Unmarshal([]byte(n.Extra), &notification)
 
                 if err != nil {
                     fmt.Println("error:",err)
                 }
 
-                fmt.Printf("%+v", task)
+                var task = notification.Task
 
-                TaskQueue <- task.Data
+                if task.Status != "todo" {
+                    return
+                }
+
+                fmt.Println("Received data from channel [", n.Channel, "] :")
+
+                fmt.Printf("%+v \n", notification)
+
+                TaskQueue <- notification.Task
 
                 return
 
@@ -76,13 +108,10 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                     l.Ping()
                 }()
 
-                // get the database informations
-                var dbmapper = initDb()
-
                 // retrieve all task
                 var tasks []Task
 
-                _, err := dbmapper.Select(&tasks, "select * from task order by id asc")
+                _, err := d.connector.Select(&tasks, "select * from task where status = :status order by id asc", map[string]interface{}{"status":"todo"})
 
                 if err != nil {
                     log.Fatalln("Select failed", err)

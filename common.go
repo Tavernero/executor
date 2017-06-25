@@ -12,6 +12,7 @@ import (
 // ================================================= //
 // ================================================= //
 
+//var DEBUG_FLAG = false
 var DEBUG_FLAG = true
 
 // ================================================= //
@@ -66,7 +67,7 @@ func initDb() *gorp.DbMap {
 
     // add a table, setting the table name to 'task' and
     // specifying that the Id property is an auto incrementing PK
-    dbmap.AddTableWithName(Task{}, "tasks").SetKeys(true, "ID")
+    dbmap.AddTableWithName(Task{}, "task").SetKeys(true, "ID")
 
 
 
@@ -101,53 +102,6 @@ func initDb() *gorp.DbMap {
 // ================================================= //
 // ================================================= //
 
-// Configuration for a specific task to work
-type ConfigurationTask struct {
-    ID int `db:"id, primarykey" json:"id"`
-    Function string `db:"function" json:"function"`
-    Status string `db:"status" json:"status"`
-    Properties PropertyMap `db:"properties" json:"properties"`
-}
-
-// PropertyMap for catch JSONB from databases
-type PropertyMap map[string]interface{}
-
-//func (p PropertyMap) Value() (driver.Value, error) {
-//    j, err := json.Marshal(p)
-//    return j, err
-//}
-//
-//func (p *PropertyMap) Scan(src interface{}) error {
-//    source, ok := src.([]byte)
-//    if !ok {
-//        return errors.New("Type assertion .([]byte) failed.")
-//    }
-//
-//    var i interface{}
-//    err := json.Unmarshal(source, &i)
-//    if err != nil {
-//        return err
-//    }
-//
-//    *p, ok = i.(map[string]interface{})
-//    if !ok {
-//        return errors.New("Type assertion .(map[string]interface{}) failed.")
-//    }
-//
-//    return nil
-//}
-
-//create table "task_configuration" (
-//    "id" bigserial primary key,
-//    "function" character varying(255) not null,
-//    "status" character varying(255) not null,
-//    "properties" jsonb not null default '{}'
-//);
-//
-//insert into "task_configuration" ( "function", "status", "properties" ) values
-//( 'web/create', 'available', '{"sequence":[
-//        {"step":"starting","url":"https://api.com/starting"},
-//        {"step":"ending","url":"https://api.com/ending"}]}' );
 
 
 // Dispatcher configuration object
@@ -165,3 +119,24 @@ type DispatcherStep struct {
     Name string
     Url string
 }
+
+// Configuration for a specific task to work
+//type ConfigurationTask struct {
+//    ID int `db:"id, primarykey" json:"id"`
+//    Function string `db:"function" json:"function"`
+//    Status string `db:"status" json:"status"`
+//    Properties PropertyMap `db:"properties" json:"properties"`
+//}
+//
+//create table "task_configuration" (
+//    "id" bigserial primary key,
+//    "function" character varying(255) not null,
+//    "status" character varying(255) not null,
+//    "properties" jsonb not null default '{}'
+//);
+//
+//insert into "task_configuration" ( "function", "status", "properties" ) values
+//( 'web/create', 'available', '{"sequence":[
+//        {"step":"starting","url":"https://api.com/starting"},
+//        {"step":"ending","url":"https://api.com/ending"}]}' );
+
