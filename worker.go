@@ -2,19 +2,15 @@ package main
 
 import (
     "log"
-
-    "gopkg.in/gorp.v2"
-    _ "github.com/lib/pq"
-
     "fmt"
-//    "math/rand"
     "strconv"
-//    "time"
-
     "net/http"
     "io/ioutil"
     "bytes"
+    "time"
     "encoding/json"
+    "gopkg.in/gorp.v2"
+    _ "github.com/lib/pq"
 )
 
 // ================================================= //
@@ -63,16 +59,11 @@ func (w Worker) Start() {
                     }
 
                     log.Println(".")
-                    log.Println(".")
                     log.Println("ENDJOB")
                     log.Println(".")
-                    log.Println(".")
-//                    // we have received a work request.
-//                    if err :. task.WorkingOn(); err !. nil {
-//                        log.Printf("Error while working on task: %s", err.Error())
-//                    }
 
                 case <-w.quit:
+
                     // we have received a signal to stop
                     return
             }
@@ -89,7 +80,35 @@ type HttpOut struct {
 
 
 
+// Response http from each API response
+type HttpResponse struct {
+    Interval int
+    Step string
+    Buffer JsonB
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 func (w Worker) Action(task Task) error {
+
+    // Little sleeper for best test works
+    time.Sleep( time.Second )
 
     // vars
     var ending = false
@@ -126,7 +145,8 @@ func (w Worker) Action(task Task) error {
 
     // retrieve step data
     for i, s := range w.Steps {
-        log.Println(" id . " + strconv.Itoa(i) + " step . " + s.Name )
+
+        log.Println("Steps => id . " + strconv.Itoa(i) + " step . " + s.Name )
 
         if s.Name == task.Step {
             stepId = i
@@ -181,56 +201,332 @@ func (w Worker) Action(task Task) error {
 
     log.Println("-------------------------------")
 
-    var statusCode = resp.StatusCode
-
-    if statusCode != 200 {
-
-        // need to match errors states
-
-
-        task.Status = "error"
-
-
-        res, err = w.connector.Update(&task)
-
-        if err != nil {
-            log.Fatalln("update fialed", err)
-        }
-
-        log.Println("Rows updated:", res)
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    //  200 = next                                                         //
+    //  302 = next to '...' step or/and next in '...' interval of seconds  //
+    //  420 = cancelled                                                    //
+    //  500 = problem ( error with auto retry )                            //
+    //  520 = error                                                        //
+    //_____________________________________________________________________//
 
 
+    // Decoding the returned body data
+    var httpResponse HttpResponse
 
-        return nil
-    }
-
-    // 200 ok, 
-
-    task.Status = "todo"
-    // task.LastUpdate = time.Now()
-
-
-    var dataJson JsonB
-
-    err = json.Unmarshal(body, &dataJson)
-    //err := json.Unmarshal([]byte(n.Extra), &notification)
+    err = json.Unmarshal(body, &httpResponse)
 
     if err != nil {
-        fmt.Println("error:",err)
+        log.Fatalln("Error while decode the http response body", err)
     }
 
-    //task.Buffer[ task.Step ] = string(body) // maybe decaps to recaps into go struct and not only string
-    task.Buffer[ task.Step ] = dataJson
+    // Switch on each status code
+    switch resp.StatusCode {
 
-    res, err = w.connector.Update(&task)
+        // 200 = next
+        case 200:
 
-    if err != nil {
-        log.Fatalln("update fialed", err)
+
+            // retrieve the next step informations
+            nextStep := w.Steps[ stepId + 1 ]
+
+            if nextStep.ID == 0 {
+                log.Fatalln("Imposisble to found the next step")
+            }
+
+
+            // Update the task informations
+            task.Status = "todo"
+            task.Step = nextStep.Name
+            task.Buffer = dataJson
+            // task.LastUpdate = time.Now()
+
+            // Do request on the database
+            res, err = w.connector.Update(&task)
+
+            if err != nil {
+                log.Fatalln("update fialed", err)
+            }
+
+            log.Println("Rows updated:", res)
+
+            return nil
+
+
+
+
+
+
+
+
+
+
+
+        // 302 = next to '...' step or/and next in '...' interval of seconds
+        case 302:
+
+
+            // 200 ok, 
+
+            // retrieve the next step informations
+            nextStep := w.Steps[ stepId + 1 ]
+
+            if nextStep.ID == 0 {
+                log.Fatalln("Imposisble to found the next step")
+            }
+
+            // Decoding the return buffer informations
+            var dataJson JsonB
+
+            err = json.Unmarshal(body, &dataJson)
+            //err := json.Unmarshal([]byte(n.Extra), &notification)
+
+            if err != nil {
+                fmt.Println("error:",err)
+            }
+
+            // Update the task informations
+            task.Status = "todo"
+            task.Step = nextStep.Name
+            task.Buffer = dataJson
+            // task.LastUpdate = time.Now()
+
+            // Do request on the database
+            res, err = w.connector.Update(&task)
+
+            if err != nil {
+                log.Fatalln("update fialed", err)
+            }
+
+            log.Println("Rows updated:", res)
+
+            return nil
+
+
+        // 420 = cancelled
+        case 420:
+
+
+            // 200 ok, 
+
+            // retrieve the next step informations
+            nextStep := w.Steps[ stepId + 1 ]
+
+            if nextStep.ID == 0 {
+                log.Fatalln("Imposisble to found the next step")
+            }
+
+            // Decoding the return buffer informations
+            var dataJson JsonB
+
+            err = json.Unmarshal(body, &dataJson)
+            //err := json.Unmarshal([]byte(n.Extra), &notification)
+
+            if err != nil {
+                fmt.Println("error:",err)
+            }
+
+            // Update the task informations
+            task.Status = "todo"
+            task.Step = nextStep.Name
+            task.Buffer = dataJson
+            // task.LastUpdate = time.Now()
+
+            // Do request on the database
+            res, err = w.connector.Update(&task)
+
+            if err != nil {
+                log.Fatalln("update fialed", err)
+            }
+
+            log.Println("Rows updated:", res)
+
+            return nil
+
+
+        // 500 = problem ( error with auto retry )
+        case 500:
+
+
+            // 200 ok, 
+
+            // retrieve the next step informations
+            nextStep := w.Steps[ stepId + 1 ]
+
+            if nextStep.ID == 0 {
+                log.Fatalln("Imposisble to found the next step")
+            }
+
+            // Decoding the return buffer informations
+            var dataJson JsonB
+
+            err = json.Unmarshal(body, &dataJson)
+            //err := json.Unmarshal([]byte(n.Extra), &notification)
+
+            if err != nil {
+                fmt.Println("error:",err)
+            }
+
+            // Update the task informations
+            task.Status = "todo"
+            task.Step = nextStep.Name
+            task.Buffer = dataJson
+            // task.LastUpdate = time.Now()
+
+            // Do request on the database
+            res, err = w.connector.Update(&task)
+
+            if err != nil {
+                log.Fatalln("update fialed", err)
+            }
+
+            log.Println("Rows updated:", res)
+
+            return nil
+
+
+        // 520 = error
+        case 520:
+
+
+            // 200 ok, 
+
+            // retrieve the next step informations
+            nextStep := w.Steps[ stepId + 1 ]
+
+            if nextStep.ID == 0 {
+                log.Fatalln("Imposisble to found the next step")
+            }
+
+            // Decoding the return buffer informations
+            var dataJson JsonB
+
+            err = json.Unmarshal(body, &dataJson)
+            //err := json.Unmarshal([]byte(n.Extra), &notification)
+
+            if err != nil {
+                fmt.Println("error:",err)
+            }
+
+            // Update the task informations
+            task.Status = "todo"
+            task.Step = nextStep.Name
+            task.Buffer = dataJson
+            // task.LastUpdate = time.Now()
+
+            // Do request on the database
+            res, err = w.connector.Update(&task)
+
+            if err != nil {
+                log.Fatalln("update fialed", err)
+            }
+
+            log.Println("Rows updated:", res)
+
+            return nil
+
+
+        // status code not handled
+        default:
+
+
+            // 200 ok, 
+
+            // retrieve the next step informations
+            nextStep := w.Steps[ stepId + 1 ]
+
+            if nextStep.ID == 0 {
+                log.Fatalln("Imposisble to found the next step")
+            }
+
+            // Decoding the return buffer informations
+            var dataJson JsonB
+
+            err = json.Unmarshal(body, &dataJson)
+            //err := json.Unmarshal([]byte(n.Extra), &notification)
+
+            if err != nil {
+                fmt.Println("error:",err)
+            }
+
+            // Update the task informations
+            task.Status = "todo"
+            task.Step = nextStep.Name
+            task.Buffer = dataJson
+            // task.LastUpdate = time.Now()
+
+            // Do request on the database
+            res, err = w.connector.Update(&task)
+
+            if err != nil {
+                log.Fatalln("update fialed", err)
+            }
+
+            log.Println("Rows updated:", res)
+
+            return nil
+
+
     }
 
-    log.Println("Rows updated:", res)
 
-    return nil
+
+
+
+
+//
+//
+//
+//    if statusCode != 200 {
+//
+//        // need to match errors states
+//        task.Status = "error"
+//
+//        res, err = w.connector.Update(&task)
+//
+//        if err != nil {
+//            log.Fatalln("update fialed", err)
+//        }
+//
+//        log.Println("Rows updated:", res)
+//
+//        return nil
+//    }
+//
+//    // 200 ok, 
+//
+//    // retrieve the next step informations
+//    nextStep := w.Steps[ stepId + 1 ]
+//
+//    if nextStep.ID == 0 {
+//        log.Fatalln("Imposisble to found the next step")
+//    }
+//
+//    // Decoding the return buffer informations
+//    var dataJson JsonB
+//
+//    err = json.Unmarshal(body, &dataJson)
+//    //err := json.Unmarshal([]byte(n.Extra), &notification)
+//
+//    if err != nil {
+//        fmt.Println("error:",err)
+//    }
+//
+//    // Update the task informations
+//    task.Status = "todo"
+//    task.Step = nextStep.Name
+//    task.Buffer = dataJson
+//    // task.LastUpdate = time.Now()
+//
+//    // Do request on the database
+//    res, err = w.connector.Update(&task)
+//
+//    if err != nil {
+//        log.Fatalln("update fialed", err)
+//    }
+//
+//    log.Println("Rows updated:", res)
+//
+//    return nil
 }
 
 
@@ -240,16 +536,3 @@ func (w Worker) Stop() {
         w.quit <- true
     }()
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

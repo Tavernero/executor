@@ -1,20 +1,12 @@
 package main
 
 import (
-    "fmt"
-    "encoding/json"
     "io"
-    "net/http"
+    "fmt"
     "time"
+    "net/http"
+    "encoding/json"
 )
-
-var (
-    MaxWorker       = 20  //os.Getenv("MAX_WORKERS")
-    MaxDatabaseWorker       = 20  //os.Getenv("MAX_WORKERS")
-    MaxQueue        = 5 //os.Getenv("MAX_QUEUE")
-    MaxLength int64 = 20480
-)
-
 
 func main() {
 
@@ -24,8 +16,9 @@ func main() {
 
     http.HandleFunc("/onServer", postOnServer)
 
-//    http.HandleFunc("/onInterne", postOnInterne)
-//    http.HandleFunc("/ending", postEnding)
+    http.HandleFunc("/onInterne", postOnInterne)
+
+    http.HandleFunc("/ending", postEnding)
 
     err := http.ListenAndServe(":8080", nil)
 
@@ -41,202 +34,312 @@ func main() {
 // ================================================= //
 // ================================================= //
 
-type HttpOut struct {
-    Name string
-    Arguments JsonB
-    Buffer JsonB
+var MaxLength int64 = 2048
+
+// Data received from the executor
+type StepData struct {
+    Name        string
+    Arguments   JsonB
+    Buffer      JsonB
 }
 
-
-type Profile struct {
-      Name    string
-    Hobbies []string
-}
-
+// Starting step
 func postStarting(w http.ResponseWriter, r *http.Request) {
 
+    fmt.Println("========================================")
+
+    fmt.Println("----------- Request received -----------")
+
+    w.Header().Set("Content-Type", "application/json")
+
     if r.Method != "POST" {
+
         w.WriteHeader(http.StatusMethodNotAllowed)
+
         return
     }
 
-    fmt.Println("Request received")
+    // Read data from body request
+    var body = &StepData{}
 
-    fmt.Println("___________________________________")
-    // Read the body into a string for json decoding
-    var content = &HttpOut{}
-    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
+    // Decode body json data
+    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&body)
+
     if err != nil {
+
         fmt.Errorf("an error occured while deserializing message")
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
         w.WriteHeader(http.StatusBadRequest)
+
+        fmt.Println("========================================")
+
         return
     }
-    fmt.Println( content )
-    fmt.Println("___________________________________")
 
+    fmt.Println( body )
 
-    profile := Profile{"Alex", []string{"snowboarding", "programming"}}
+    fmt.Println("------------- Body decoded -------------")
 
-    js, err := json.Marshal(profile)
+    // ========================================
+    // ========================================
+    // ============= DO THE WORK ==============
+    // ========================================
+    // ========================================
+
+    var buffer = body.Buffer
+
+    buffer["steps"] = []string{"starting"}
+
+    // ========================================
+    // ========================================
+    // ============ / DO THE WORK =============
+    // ========================================
+    // ========================================
+
+    fmt.Println("------------- Action done --------------")
+
+    js, err := json.Marshal( buffer )
 
     if err != nil {
+
         http.Error(w, err.Error(), http.StatusInternalServerError)
+
+        fmt.Println("========================================")
+
         return
     }
 
     w.Header().Set("Content-Type", "application/json")
+
     w.Write(js)
 
+    fmt.Println("------------- Send response ------------")
 
-
-
-
-//    w.WriteHeader(http.StatusOK)
+    fmt.Println("========================================")
 }
 
 func postOnServer(w http.ResponseWriter, r *http.Request) {
 
+    fmt.Println("========================================")
+
+    fmt.Println("----------- Request received -----------")
+
+    w.Header().Set("Content-Type", "application/json")
+
     if r.Method != "POST" {
+
         w.WriteHeader(http.StatusMethodNotAllowed)
+
         return
     }
 
-    fmt.Println("Request received")
+    // Read data from body request
+    var body = &StepData{}
 
-    fmt.Println("___________________________________")
-    // Read the body into a string for json decoding
-    var content = &HttpOut{}
-    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
+    // Decode body json data
+    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&body)
+
     if err != nil {
+
         fmt.Errorf("an error occured while deserializing message")
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
         w.WriteHeader(http.StatusBadRequest)
+
+        fmt.Println("========================================")
+
         return
     }
-    fmt.Println( content )
-    fmt.Println("___________________________________")
 
+    fmt.Println( body )
 
-    profile := Profile{"Noemi", []string{"toto", "success"}}
+    fmt.Println("------------- Body decoded -------------")
 
-    js, err := json.Marshal(profile)
+    // ========================================
+    // ========================================
+    // ============= DO THE WORK ==============
+    // ========================================
+    // ========================================
+
+    var buffer = body.Buffer
+
+    buffer["steps"] = []string{ "starting", "onServer" }
+
+    // ========================================
+    // ========================================
+    // ============ / DO THE WORK =============
+    // ========================================
+    // ========================================
+
+    fmt.Println("------------- Action done --------------")
+
+    js, err := json.Marshal( buffer )
 
     if err != nil {
+
         http.Error(w, err.Error(), http.StatusInternalServerError)
+
+        fmt.Println("========================================")
+
         return
     }
 
     w.Header().Set("Content-Type", "application/json")
+
     w.Write(js)
 
+    fmt.Println("------------- Send response ------------")
 
-
-
-
-//    w.WriteHeader(http.StatusOK)
+    fmt.Println("========================================")
 }
 
 
-//// ================================================= //
-//// ================================================= //
-//
-//func postOnServer(w http.ResponseWriter, r *http.Request) {
-//
-//    if r.Method != "POST" {
-//        w.WriteHeader(http.StatusMethodNotAllowed)
-//        return
-//    }
-//
-//    // Read the body into a string for json decoding
-//    var content = &TaskCollection{}
-//    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
-//    if err != nil {
-//        fmt.Errorf("an error occured while deserializing message")
-//        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-//        w.WriteHeader(http.StatusBadRequest)
-//        return
-//    }
-//
-//    fmt.Println("Request received")
-//
-//    // Go through each payload and queue items individually to be posted to S3
-//    for _, task := range content.Tasks {
-//
-//        // Push the work onto the queue.
-//        TaskQueue <- task
-//
-//        fmt.Println("Payload sent to workqueue : " + strconv.Itoa( task.ID ) )
-//    }
-//
-//    w.WriteHeader(http.StatusOK)
-//}
-//
-//// ================================================= //
-//// ================================================= //
-//
-//func postOnInterne(w http.ResponseWriter, r *http.Request) {
-//
-//    if r.Method != "POST" {
-//        w.WriteHeader(http.StatusMethodNotAllowed)
-//        return
-//    }
-//
-//    // Read the body into a string for json decoding
-//    var content = &TaskCollection{}
-//    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
-//    if err != nil {
-//        fmt.Errorf("an error occured while deserializing message")
-//        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-//        w.WriteHeader(http.StatusBadRequest)
-//        return
-//    }
-//
-//    fmt.Println("Request received")
-//
-//    // Go through each payload and queue items individually to be posted to S3
-//    for _, task := range content.Tasks {
-//
-//        // Push the work onto the queue.
-//        TaskQueue <- task
-//
-//        fmt.Println("Payload sent to workqueue : " + strconv.Itoa( task.ID ) )
-//    }
-//
-//    w.WriteHeader(http.StatusOK)
-//}
-//
-//// ================================================= //
-//// ================================================= //
-//
-//func postEnding(w http.ResponseWriter, r *http.Request) {
-//
-//    if r.Method != "POST" {
-//        w.WriteHeader(http.StatusMethodNotAllowed)
-//        return
-//    }
-//
-//    // Read the body into a string for json decoding
-//    var content = &TaskCollection{}
-//    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
-//    if err != nil {
-//        fmt.Errorf("an error occured while deserializing message")
-//        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-//        w.WriteHeader(http.StatusBadRequest)
-//        return
-//    }
-//
-//    fmt.Println("Request received")
-//
-//    // Go through each payload and queue items individually to be posted to S3
-//    for _, task := range content.Tasks {
-//
-//        // Push the work onto the queue.
-//        TaskQueue <- task
-//
-//        fmt.Println("Payload sent to workqueue : " + strconv.Itoa( task.ID ) )
-//    }
-//
-//    w.WriteHeader(http.StatusOK)
-//}
-//
+
+func postOnInterne(w http.ResponseWriter, r *http.Request) {
+
+    fmt.Println("========================================")
+
+    fmt.Println("----------- Request received -----------")
+
+    w.Header().Set("Content-Type", "application/json")
+
+    if r.Method != "POST" {
+
+        w.WriteHeader(http.StatusMethodNotAllowed)
+
+        return
+    }
+
+    // Read data from body request
+    var body = &StepData{}
+
+    // Decode body json data
+    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&body)
+
+    if err != nil {
+
+        fmt.Errorf("an error occured while deserializing message")
+
+        w.WriteHeader(http.StatusBadRequest)
+
+        fmt.Println("========================================")
+
+        return
+    }
+
+    fmt.Println( body )
+
+    fmt.Println("------------- Body decoded -------------")
+
+    // ========================================
+    // ========================================
+    // ============= DO THE WORK ==============
+    // ========================================
+    // ========================================
+
+    var buffer = body.Buffer
+
+    buffer["data"] = map[string]interface{}{"name":"noemi","informations":[]string{"toto", "success"}}
+
+    // ========================================
+    // ========================================
+    // ============ / DO THE WORK =============
+    // ========================================
+    // ========================================
+
+    fmt.Println("------------- Action done --------------")
+
+    js, err := json.Marshal( buffer )
+
+    if err != nil {
+
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+
+        fmt.Println("========================================")
+
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+
+    w.Write(js)
+
+    fmt.Println("------------- Send response ------------")
+
+    fmt.Println("========================================")
+}
+
+
+
+
+func postEnding(w http.ResponseWriter, r *http.Request) {
+
+    fmt.Println("========================================")
+
+    fmt.Println("----------- Request received -----------")
+
+    w.Header().Set("Content-Type", "application/json")
+
+    if r.Method != "POST" {
+
+        w.WriteHeader(http.StatusMethodNotAllowed)
+
+        return
+    }
+
+    // Read data from body request
+    var body = &StepData{}
+
+    // Decode body json data
+    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&body)
+
+    if err != nil {
+
+        fmt.Errorf("an error occured while deserializing message")
+
+        w.WriteHeader(http.StatusBadRequest)
+
+        fmt.Println("========================================")
+
+        return
+    }
+
+    fmt.Println( body )
+
+    fmt.Println("------------- Body decoded -------------")
+
+    // ========================================
+    // ========================================
+    // ============= DO THE WORK ==============
+    // ========================================
+    // ========================================
+
+    var buffer = body.Buffer
+
+    // ========================================
+    // ========================================
+    // ============ / DO THE WORK =============
+    // ========================================
+    // ========================================
+
+    fmt.Println("------------- Action done --------------")
+
+    js, err := json.Marshal( buffer )
+
+    if err != nil {
+
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+
+        fmt.Println("========================================")
+
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+
+    w.Write(js)
+
+    fmt.Println("------------- Send response ------------")
+
+    fmt.Println("========================================")
+}
+

@@ -3,23 +3,24 @@ package main
 import (
     "fmt"
     "log"
-
-    "encoding/json"
     "time"
-
+    "encoding/json"
     "database/sql"
     "github.com/lib/pq"
 )
 
-
-
 // read all tasks from the database
 func (d *Dispatcher) firstRead() {
+
+    log.Println("Read the first batch")
 
     // retrieve all task
     var tasks []Task
 
-    _, err := d.connector.Select(&tasks, "select * from task where status = :status order by id asc", map[string]interface{}{"status":"todo"})
+    _, err := d.connector.Select(
+        &tasks,
+        "select * from task where status = :status order by id asc",
+        map[string]interface{}{"status":"todo"} )
 
     if err != nil {
         log.Fatalln("Select failed", err)
@@ -28,14 +29,12 @@ func (d *Dispatcher) firstRead() {
     log.Println("All rows:")
 
     for x, task := range tasks {
-        TaskQueue <- task
+
+        d.TaskQueue <- task
 
         log.Printf("  %d : %v\n", x, task)
     }
 }
-
-
-
 
 // prepare the listener data and launch it
 func (d *Dispatcher) initializeListenerAndLaunch() {
@@ -67,7 +66,6 @@ func (d *Dispatcher) initializeListenerAndLaunch() {
     }
 }
 
-
 type DatabaseNotification struct {
     Table   string
     Action  string
@@ -79,6 +77,7 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
     for {
         select {
             case n := <-l.Notify:
+
                 var notification DatabaseNotification
 
                 err := json.Unmarshal([]byte(n.Extra), &notification)
@@ -87,8 +86,16 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                     fmt.Println("error:",err)
                 }
 
+                // no deleted rows
+                // XXX : maybe no listen deleted rows in trigger
+                if notification.Action == "DELETE" {
+                    return
+                }
+                // / XXX
+
                 var task = notification.Task
 
+                // no work on no todo tasks
                 if task.Status != "todo" {
                     return
                 }
@@ -97,11 +104,14 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
 
                 fmt.Printf("%+v \n", notification)
 
-                TaskQueue <- notification.Task
+                d.TaskQueue <- notification.Task
+
+                fmt.Println("Data send in task queue")
 
                 return
 
             case <-time.After(90 * time.Second):
+
                 fmt.Println("Received no events for 90 seconds, checking connection")
 
                 go func() {
@@ -111,7 +121,10 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                 // retrieve all task
                 var tasks []Task
 
-                _, err := d.connector.Select(&tasks, "select * from task where status = :status order by id asc", map[string]interface{}{"status":"todo"})
+                _, err := d.connector.Select(
+                    &tasks,
+                    "select * from task where status = :status order by id asc",
+                    map[string]interface{}{"status":"todo"} )
 
                 if err != nil {
                     log.Fatalln("Select failed", err)
@@ -120,7 +133,7 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                 log.Println("All rows:")
 
                 for x, task := range tasks {
-                    TaskQueue <- task
+                    d.TaskQueue <- task
 
                     log.Printf("  %d : %v\n", x, task)
                 }

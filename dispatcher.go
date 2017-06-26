@@ -3,9 +3,7 @@ package main
 import (
     "fmt"
     "log"
-
     "strconv"
-
     "gopkg.in/gorp.v2"
     _ "github.com/lib/pq"
 )
@@ -14,6 +12,8 @@ import (
 type Dispatcher struct {
     Configuration   Configuration
     WorkerPool      chan chan Task
+    TaskQueue       chan Task
+
     quit            chan bool
     Steps           []DispatcherStep
     connector       *gorp.DbMap
@@ -22,8 +22,10 @@ type Dispatcher struct {
 // Create a new dispatcher
 func NewDispatcher(conf Configuration) *Dispatcher {
     pool := make(chan chan Task, conf.MaxWorkers)
+    queue := make(chan Task, conf.MaxQueue)
     return &Dispatcher{
         WorkerPool: pool,
+        TaskQueue: queue,
         Configuration: conf }
 }
 
@@ -35,21 +37,22 @@ func (d *Dispatcher) Run() {
     // XXX : defer d.connector.Db.Close()
 
     // retrieving steps from db
-    _, err := d.connector.Select(&d.Steps, "select * from task_step where function = :function order by index asc", map[string]interface{}{"function":d.Configuration.Function})
+    _, err := d.connector.Select(
+        &d.Steps,
+        "select * from task_step where function = :function order by index asc",
+        map[string]interface{}{"function":d.Configuration.Function} )
 
     if err != nil {
         log.Fatalln("Select failed", err)
     }
 
-    if DEBUG_FLAG {
-        log.Println("All task steps :")
+    log.Println("All task steps :")
 
-        for x, p := range d.Steps {
-            log.Printf("  %d  :  %v", x, p)
-        }
-
-        log.Println("===============")
+    for x, p := range d.Steps {
+        log.Printf("  %d  :  %v", x, p)
     }
+
+    log.Println("===============")
 
     // starting n number of workers
     for i := 0; i < d.Configuration.MaxWorkers; i++ {
@@ -72,19 +75,21 @@ func (d *Dispatcher) dispatch() {
     fmt.Println("Worker queue dispatcher started...")
     for {
         select {
-            case task := <-TaskQueue:
+            case task := <-d.TaskQueue:
 
                 log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa( task.ID ) )
 
-                // a task request has been receive
-                go func(task Task) {
-                    // try to obtain a worker task channel that is available.
-                    // this will block until a worker is idle
-                    taskChannel := <-d.WorkerPool
+//                // a task request has been receive
+//                go func(task Task) {
 
-                    // dispatch the task to the worker task channel
-                    taskChannel <- task
-                }(task)
+                // try to obtain a worker task channel that is available.
+                // this will block until a worker is idle
+                taskChannel := <-d.WorkerPool
+
+                // dispatch the task to the worker task channel
+                taskChannel <- task
+
+//                }(task)
 
             case <-d.quit:
                 // we have received a signal to stop
@@ -103,37 +108,3 @@ func (d *Dispatcher) Stop() {
         d.quit <- true
     }()
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

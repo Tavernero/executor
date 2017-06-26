@@ -9,15 +9,11 @@ import (
 
 func main() {
 
-    TaskQueue = make(chan Task, MaxQueue)
-
-    go launchHttpServer()
-
     log.Println("main start")
 
     configuration := Configuration{
         MaxWorkers:MaxWorker,
-        MaxDatabaseWorkers:MaxDatabaseWorker,
+        MaxQueue:MaxQueue,
         Function:"create" }
 
     dispatcher := NewDispatcher(configuration)
