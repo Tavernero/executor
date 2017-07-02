@@ -22,11 +22,13 @@ type Worker struct {
     quit        chan bool
     Steps       []DispatcherStep
     connector   *gorp.DbMap
+    Function    string
 }
 
 // Create a new worker
-func NewWorker(workerPool chan chan Task,steps []DispatcherStep) Worker {
+func NewWorker(function string,workerPool chan chan Task,steps []DispatcherStep) Worker {
     return Worker{
+        Function: function,
         WorkerPool: workerPool,
         TaskChannel: make(chan Task),
         quit: make(chan bool),
@@ -50,10 +52,10 @@ func (w Worker) Start() {
             select {
                 case task := <-w.TaskChannel:
 
-                    log.Printf("Entry to taskChannel with ID : " + strconv.Itoa( task.ID ) + "\n")
+                    log.Printf("Entry to taskChannel with ID : " + strconv.Itoa( int(task.ID) ) + "\n")
 
                     // we have received a work request.
-                    if err := w.Action(task); err != nil {
+                    if err := w.Action(task.ID); err != nil {
                         log.Printf("Error while working on task: %s", err.Error())
                     }
 
@@ -118,10 +120,20 @@ type HttpResponse struct {
     Comment     *string
 }
 
-func (w Worker) Action(task Task) error {
+func (w Worker) Action(id int64) error {
+
 
     // Little sleeper for best test works
     time.Sleep( time.Second )
+
+
+
+    task, err := w.readOne(id)
+
+    if err != nil {
+        log.Fatalln("Error while fetching one task", err)
+    }
+
 
     // vars
     var ending = false
@@ -176,7 +188,7 @@ func (w Worker) Action(task Task) error {
         log.Fatalln("Error while finding the good task step informations")
     }
 
-    log.Println("Working on task " + strconv.Itoa( task.ID ) + "/" + task.Function + " on step: " + task.Step )
+    log.Println("Working on task " + strconv.Itoa( int(task.ID) ) + "/" + task.Function + " on step: " + task.Step )
 
 
 

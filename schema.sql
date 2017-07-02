@@ -52,7 +52,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER "task_event"
     AFTER INSERT OR UPDATE ON "task"
     FOR EACH ROW
-    WHEN ( NEW.retry > 0 AND NEW.todo_date <= NOW() )
+    WHEN ( NEW.todo_date <= NOW() AND NEW.retry > 0 )
     EXECUTE PROCEDURE notify_event();
 
 

@@ -56,7 +56,7 @@ func (d *Dispatcher) Run() {
 
     // starting n number of workers
     for i := 0; i < d.Configuration.MaxWorkers; i++ {
-        worker := NewWorker(d.WorkerPool,d.Steps)
+        worker := NewWorker(d.Configuration.Function,d.WorkerPool,d.Steps)
         worker.Start()
     }
 
@@ -77,7 +77,7 @@ func (d *Dispatcher) dispatch() {
         select {
             case task := <-d.TaskQueue:
 
-                log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa( task.ID ) )
+                log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa( int(task.ID) ) )
 
 //                // a task request has been receive
 //                go func(task Task) {

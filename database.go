@@ -11,15 +11,15 @@ import (
 
 
 // read one task from the database
-func (d *Dispatcher) readOne(id int64) (task Task, err error) {
+func (w *Worker) readOne(id int64) (task Task, err error) {
 
     log.Println("Read one task")
 
     // retrieve all task
-    _, err = d.connector.Select(
+    _, err = w.connector.Select(
         &task,
         "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() order by id asc",
-        map[string]interface{}{"status":"todo","function":d.Configuration.Function,"id":id} )
+        map[string]interface{}{"status":"todo","function":w.Function,"id":id} )
 
     if err != nil {
         log.Fatalln("Select failed", err)

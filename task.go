@@ -7,7 +7,7 @@ import (
 
 // Task to work
 type Task struct {
-    ID int `db:"id, primarykey" json:"id"`
+    ID int64 `db:"id, primarykey" json:"id"`
     Function string `db:"function" json:"function"`
     Name string `db:"name" json:"name"`
     Step string `db:"step" json:"step"`
