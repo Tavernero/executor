@@ -9,7 +9,7 @@ import (
 
 func main() {
 
-    log.Println("main start")
+    log.Println("Main start")
 
     configuration := Configuration{
         MaxWorkers:MaxWorker,

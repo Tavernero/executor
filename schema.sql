@@ -7,6 +7,11 @@ create table "task" (
     "step" character varying(255) not null,
     "status" character varying(255) not null,
     "retry" bigint not null,
+    "comment" character varying(255) default '',
+--    "creation_date" timestamp without time zone not null default now(),
+--    "todo_date" timestamp without time zone not null default now(),
+    "last_update" timestamp with time zone not null default now(),
+--    "done_date" timestamp without time zone,
     "arguments" jsonb not null default '{}',
     "buffer" jsonb not null default '{}'
 );
@@ -94,7 +99,40 @@ create table "task_step" (
 );
 
 insert into "task_step" ( "function", "index", "name", "url" ) values 
-    ( 'create', 10, 'starting',  'http://localhost:8080/starting'  ),
-    ( 'create', 20, 'onServer',  'http://localhost:8080/onServer'  ),
-    ( 'create', 30, 'onInterne', 'http://localhost:8080/onInterne' ),
-    ( 'create', 40, 'ending',    'http://localhost:8080/ending'    );
+    ( 'create', 10, 'starting',  'http://localhost:8080/create/starting'  ),
+    ( 'create', 20, 'onServer',  'http://localhost:8080/create/onServer'  ),
+    ( 'create', 30, 'onInterne', 'http://localhost:8080/create/onInterne' ),
+    ( 'create', 40, 'ending',    'http://localhost:8080/create/ending'    );
+
+insert into "task_step" ( "function", "index", "name", "url" ) values 
+    ( 'update', 10, 'starting',  'http://localhost:8080/update/starting'  ),
+    ( 'update', 20, 'onServer',  'http://localhost:8080/update/onServer'  ),
+    ( 'update', 30, 'onInterne', 'http://localhost:8080/update/onInterne' ),
+    ( 'update', 40, 'ending',    'http://localhost:8080/update/ending'    );
+
+insert into "task_step" ( "function", "index", "name", "url" ) values 
+    ( 'delete', 10, 'starting',  'http://localhost:8080/delete/starting'  ),
+    ( 'delete', 20, 'onServer',  'http://localhost:8080/delete/onServer'  ),
+    ( 'delete', 30, 'onInterne', 'http://localhost:8080/delete/onInterne' ),
+    ( 'delete', 40, 'ending',    'http://localhost:8080/delete/ending'    );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -2,7 +2,6 @@ package main
 
 import (
     "log"
-    "fmt"
     "strconv"
     "net/http"
     "io/ioutil"
@@ -80,11 +79,17 @@ type HttpOut struct {
 
 
 
+
+
+
+
+
 // Response http from each API response
-type HttpResponse struct {
-    Interval int
-    Step string
-    Buffer JsonB
+type HttpResponse struct {
+    Buffer      *JsonB
+    Interval    int
+    Comment     string
+    Step        string
 }
 
 
@@ -104,18 +109,43 @@ type HttpResponse struct {
 
 
 
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    //  200  = next                                                         //
+    //  302  = next to '...' step or/and next in '...' interval of seconds  //
+    //  420  = cancelled                                                    //
+    //  520  = problem                                                      //
+    // other = error ( 5XX : auto-retry )                                   //
+    //______________________________________________________________________//
+
+
 
 func (w Worker) Action(task Task) error {
 
+
+
+
+
+
     // Little sleeper for best test works
     time.Sleep( time.Second )
+
+
+
+
+
 
     // vars
     var ending = false
 
     // update task status
     task.Status = "doing"
-    // task.LastUpdate = time.Now()
+    //task.LastUpdate = time.Now()
+
+
+    log.Println( "==============================================================" )
+    log.Println( task )
+    log.Println( "==============================================================" )
+
 
     // exception for ending steps
     if task.Step == "ending" {
@@ -146,7 +176,7 @@ func (w Worker) Action(task Task) error {
     // retrieve step data
     for i, s := range w.Steps {
 
-        log.Println("Steps => id . " + strconv.Itoa(i) + " step . " + s.Name )
+//        log.Println("Steps => id . " + strconv.Itoa(i) + " step . " + s.Name )
 
         if s.Name == task.Step {
             stepId = i
@@ -161,100 +191,54 @@ func (w Worker) Action(task Task) error {
 
     log.Println("Working on task " + strconv.Itoa( task.ID ) + "/" + task.Function + " on step: " + task.Step )
 
-    // initialize the http client
-    httpclient := http.Client{}
 
 
 
-    var dataOut = HttpOut{
-        Name: task.Name,
-        Arguments: task.Arguments,
-        Buffer: task.Buffer}
 
-    jsonValue, _ := json.Marshal(dataOut)
 
-    req, err := http.NewRequest("POST", stepData.Url, bytes.NewBuffer(jsonValue))
 
-    req.Header.Set("X-Custom-Header", "myvalue")
 
-    req.Header.Set("Content-Type", "application/json")
 
-    log.Println("===============================")
-    log.Printf("Post data request was '", string(jsonValue), "'")
-
-    resp, err := httpclient.Do(req)
+    // Do the http call to retrieve API data/informations
+    httpResponse, statusCode, err := w.CallHttp(task, stepData)
 
     if err != nil {
-        fmt.Println("error while request", err)
-        panic(err)
-    }
+        log.Fatalln("Error while do the http call", err)
 
-    defer resp.Body.Close()
+        // No http response, we "emulate" a 500 error with a fake http response
+        httpResponse = HttpResponse{
+            Buffer: &task.Buffer,
+            Comment: "Error while doing the http call" }
 
-    fmt.Println("response Status:", resp.Status)
-
-    fmt.Println("response Headers:", resp.Header)
-
-    body, _ := ioutil.ReadAll(resp.Body)
-
-    fmt.Println("response Body:", string(body))
-
-    log.Println("-------------------------------")
-
-    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-    //  200 = next                                                         //
-    //  302 = next to '...' step or/and next in '...' interval of seconds  //
-    //  420 = cancelled                                                    //
-    //  500 = problem ( error with auto retry )                            //
-    //  520 = error                                                        //
-    //_____________________________________________________________________//
-
-
-    // Decoding the returned body data
-    var httpResponse HttpResponse
-
-    err = json.Unmarshal(body, &httpResponse)
-
-    if err != nil {
-        log.Fatalln("Error while decode the http response body", err)
+        statusCode = 500
     }
 
     // Switch on each status code
-    switch resp.StatusCode {
+    switch statusCode {
 
         // 200 = next
         case 200:
 
-
-            // retrieve the next step informations
-            nextStep := w.Steps[ stepId + 1 ]
+            // Which step next ?
+            var nextStep = w.Steps[ stepId + 1 ]
 
             if nextStep.ID == 0 {
-                log.Fatalln("Imposisble to found the next step")
+                log.Fatalln("Error while retrieve the next step")
             }
+
+
+
+
+
+
+
 
 
             // Update the task informations
             task.Status = "todo"
             task.Step = nextStep.Name
-            task.Buffer = dataJson
-            // task.LastUpdate = time.Now()
-
-            // Do request on the database
-            res, err = w.connector.Update(&task)
-
-            if err != nil {
-                log.Fatalln("update fialed", err)
-            }
-
-            log.Println("Rows updated:", res)
-
-            return nil
-
-
-
-
-
+            task.Buffer = *httpResponse.Buffer
+//            task.LastUpdate = time.Now()
 
 
 
@@ -264,49 +248,84 @@ func (w Worker) Action(task Task) error {
         // 302 = next to '...' step or/and next in '...' interval of seconds
         case 302:
 
-
-            // 200 ok, 
-
-            // retrieve the next step informations
-            nextStep := w.Steps[ stepId + 1 ]
-
-            if nextStep.ID == 0 {
-                log.Fatalln("Imposisble to found the next step")
-            }
-
-            // Decoding the return buffer informations
-            var dataJson JsonB
-
-            err = json.Unmarshal(body, &dataJson)
-            //err := json.Unmarshal([]byte(n.Extra), &notification)
-
-            if err != nil {
-                fmt.Println("error:",err)
-            }
-
-            // Update the task informations
-            task.Status = "todo"
-            task.Step = nextStep.Name
-            task.Buffer = dataJson
-            // task.LastUpdate = time.Now()
-
-            // Do request on the database
-            res, err = w.connector.Update(&task)
-
-            if err != nil {
-                log.Fatalln("update fialed", err)
-            }
-
-            log.Println("Rows updated:", res)
-
-            return nil
+////            var changed = false
+////
+////            // Need change to an other step
+////            if httpResponse.Step {
+////                // Overwrite the next step
+////                task.Step = httpResponse.Step
+////                changed = true
+////            }
+////
+////            // Need change the interval
+////            if httpResponse.Interval {
+////                // Overwrite the todo date
+//////                task.TodoDate = time.Now() + httpResponse.Interval * time.Second
+////                changed = true
+////            }
+////
+////            // Something changed ?
+////            if !changed {
+////                // XXX : what we do if no changes need to do
+////                // / XXX
+////            }
+////
+////
+////
+////
+////
+////
+////
+////
+////
+////
+////
+////            task.Status = "todo"
+////            task.Step = nextStep.Name
+//            task.Buffer = httpResponse.Buffer
+////            task.LastUpdate = time.Now()
+//
+//
+//            // retrieve the next step informations
+//            nextStep := w.Steps[ stepId + 1 ]
+//
+//            if nextStep.ID == 0 {
+//                log.Fatalln("Imposisble to found the next step")
+//            }
+//
+//            // Decoding the return buffer informations
+//            var dataJson JsonB
+//
+//            err = json.Unmarshal(body, &dataJson)
+//            //err := json.Unmarshal([]byte(n.Extra), &notification)
+//
+//            if err != nil {
+//                fmt.Println("error:",err)
+//            }
+//
+//            // Update the task informations
+//            task.Status = "todo"
+//            task.Step = nextStep.Name
+//            task.Buffer = dataJson
+//            // task.LastUpdate = time.Now()
+//
+//            // Do request on the database
+//            res, err = w.connector.Update(&task)
+//
+//            if err != nil {
+//                log.Fatalln("update fialed", err)
+//            }
+//
+//            log.Println("Rows updated:", res)
+//
+//            return nil
 
 
         // 420 = cancelled
         case 420:
 
 
-            // 200 ok, 
+            // 200 ok,
 
             // retrieve the next step informations
             nextStep := w.Steps[ stepId + 1 ]
@@ -318,12 +337,12 @@ func (w Worker) Action(task Task) error {
             // Decoding the return buffer informations
             var dataJson JsonB
 
-            err = json.Unmarshal(body, &dataJson)
-            //err := json.Unmarshal([]byte(n.Extra), &notification)
-
-            if err != nil {
-                fmt.Println("error:",err)
-            }
+//            err = json.Unmarshal(body, &dataJson)
+//            //err := json.Unmarshal([]byte(n.Extra), &notification)
+//
+//            if err != nil {
+//                fmt.Println("error:",err)
+//            }
 
             // Update the task informations
             task.Status = "todo"
@@ -343,52 +362,11 @@ func (w Worker) Action(task Task) error {
             return nil
 
 
-        // 500 = problem ( error with auto retry )
-        case 500:
-
-
-            // 200 ok, 
-
-            // retrieve the next step informations
-            nextStep := w.Steps[ stepId + 1 ]
-
-            if nextStep.ID == 0 {
-                log.Fatalln("Imposisble to found the next step")
-            }
-
-            // Decoding the return buffer informations
-            var dataJson JsonB
-
-            err = json.Unmarshal(body, &dataJson)
-            //err := json.Unmarshal([]byte(n.Extra), &notification)
-
-            if err != nil {
-                fmt.Println("error:",err)
-            }
-
-            // Update the task informations
-            task.Status = "todo"
-            task.Step = nextStep.Name
-            task.Buffer = dataJson
-            // task.LastUpdate = time.Now()
-
-            // Do request on the database
-            res, err = w.connector.Update(&task)
-
-            if err != nil {
-                log.Fatalln("update fialed", err)
-            }
-
-            log.Println("Rows updated:", res)
-
-            return nil
-
-
-        // 520 = error
+        // 520 = problem
         case 520:
 
 
-            // 200 ok, 
+            // 200 ok,
 
             // retrieve the next step informations
             nextStep := w.Steps[ stepId + 1 ]
@@ -400,12 +378,12 @@ func (w Worker) Action(task Task) error {
             // Decoding the return buffer informations
             var dataJson JsonB
 
-            err = json.Unmarshal(body, &dataJson)
-            //err := json.Unmarshal([]byte(n.Extra), &notification)
-
-            if err != nil {
-                fmt.Println("error:",err)
-            }
+//            err = json.Unmarshal(body, &dataJson)
+//            //err := json.Unmarshal([]byte(n.Extra), &notification)
+//
+//            if err != nil {
+//                fmt.Println("error:",err)
+//            }
 
             // Update the task informations
             task.Status = "todo"
@@ -424,115 +402,181 @@ func (w Worker) Action(task Task) error {
 
             return nil
 
-
-        // status code not handled
+        // other = error ( 5XX : auto-retry )
         default:
 
+            // Default status
+            status := "error"
 
-            // 200 ok, 
-
-            // retrieve the next step informations
-            nextStep := w.Steps[ stepId + 1 ]
-
-            if nextStep.ID == 0 {
-                log.Fatalln("Imposisble to found the next step")
-            }
-
-            // Decoding the return buffer informations
-            var dataJson JsonB
-
-            err = json.Unmarshal(body, &dataJson)
-            //err := json.Unmarshal([]byte(n.Extra), &notification)
-
-            if err != nil {
-                fmt.Println("error:",err)
+            // Exception for 5XX status code, auto retry
+            if ( statusCode / 100 ) == 5 {
+                status = "todo"
+                // retry -= retry
             }
 
             // Update the task informations
-            task.Status = "todo"
-            task.Step = nextStep.Name
-            task.Buffer = dataJson
-            // task.LastUpdate = time.Now()
-
-            // Do request on the database
-            res, err = w.connector.Update(&task)
-
-            if err != nil {
-                log.Fatalln("update fialed", err)
-            }
-
-            log.Println("Rows updated:", res)
-
-            return nil
-
+            task.Status = status
+            task.Buffer = *httpResponse.Buffer
+//            task.LastUpdate = time.Now()
 
     }
 
 
 
-
-
-
-//
-//
-//
-//    if statusCode != 200 {
-//
-//        // need to match errors states
-//        task.Status = "error"
-//
-//        res, err = w.connector.Update(&task)
-//
-//        if err != nil {
-//            log.Fatalln("update fialed", err)
-//        }
-//
-//        log.Println("Rows updated:", res)
-//
-//        return nil
-//    }
-//
-//    // 200 ok, 
-//
-//    // retrieve the next step informations
-//    nextStep := w.Steps[ stepId + 1 ]
-//
-//    if nextStep.ID == 0 {
-//        log.Fatalln("Imposisble to found the next step")
-//    }
-//
-//    // Decoding the return buffer informations
-//    var dataJson JsonB
-//
-//    err = json.Unmarshal(body, &dataJson)
-//    //err := json.Unmarshal([]byte(n.Extra), &notification)
-//
-//    if err != nil {
-//        fmt.Println("error:",err)
-//    }
 //
 //    // Update the task informations
-//    task.Status = "todo"
-//    task.Step = nextStep.Name
-//    task.Buffer = dataJson
-//    // task.LastUpdate = time.Now()
+//    task.Buffer = *httpResponse.Buffer
+//    task.Retry = task.Retry - 1
+////    task.LastUpdate = time.Now()
 //
-//    // Do request on the database
-//    res, err = w.connector.Update(&task)
-//
-//    if err != nil {
-//        log.Fatalln("update fialed", err)
-//    }
-//
-//    log.Println("Rows updated:", res)
-//
-//    return nil
-}
 
+
+
+
+    // Do request on the database
+    num, err := w.connector.Update(&task)
+
+    if err != nil {
+        log.Fatalln("Error while update on the database the task", err)
+    }
+
+    if num > 1 {
+        log.Fatalln("Error while updating the task, more than one row modified")
+    }
+
+    if num < 1 {
+        log.Fatalln("Error while updating the task, no row modified")
+    }
+
+    log.Println("Task updated")
+
+    return nil
+}
 
 // Stop signals the worker to stop listening for work requests.
 func (w Worker) Stop() {
     go func() {
         w.quit <- true
     }()
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func (w Worker) CallHttp(task Task, step DispatcherStep) ( httpResponse HttpResponse, statusCode int, err error ) {
+
+    // Initialize the http client
+    httpclient := http.Client{}
+
+    // Http call data
+    var dataOut = HttpOut{
+        Name: task.Name,
+        Arguments: task.Arguments,
+        Buffer: task.Buffer}
+
+    // Encode the http call data
+    jsonValue, err := json.Marshal(dataOut)
+
+    if err != nil {
+        log.Fatalln("Error while encode the http call data", err)
+
+        return httpResponse, statusCode, err
+    }
+
+    // Create the http request
+    req, err := http.NewRequest("POST", step.Url, bytes.NewBuffer(jsonValue))
+
+    if err != nil {
+        log.Fatalln("Error while create the http resquest", err)
+
+        return httpResponse, statusCode, err
+    }
+
+    // Set some headers
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("X-Custom-Header", "my-custom-header")
+
+    // Do the http call
+    resp, err := httpclient.Do(req)
+
+    if err != nil {
+        log.Fatalln("Error while do the http call", err)
+
+        return httpResponse, statusCode, err
+    }
+
+    defer resp.Body.Close()
+
+    // Read the response body
+    body, err := ioutil.ReadAll(resp.Body)
+
+    if err != nil {
+        log.Fatalln("Error while read the http body data", err)
+
+        return httpResponse, statusCode, err
+    }
+
+    log.Println("===============================")
+    log.Printf("Post data request was '%s'\n", string(jsonValue) )
+    log.Println("Response Status:", resp.Status)
+    log.Println("Response Headers:", resp.Header)
+    log.Println("Response Body:", string(body))
+    log.Println("-------------------------------")
+
+    // Decoding the returned body data
+    err = json.Unmarshal(body, &httpResponse)
+
+    if err != nil {
+        log.Fatalln("Error while decoding the http response body", err)
+
+        return httpResponse, statusCode, err
+    }
+
+    log.Println("Http call work fine")
+
+    return httpResponse, statusCode, nil
 }

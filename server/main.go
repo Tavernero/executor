@@ -12,13 +12,27 @@ func main() {
 
     fmt.Println("starting server http")
 
-    http.HandleFunc("/starting", postStarting)
+    http.HandleFunc("/create/starting", postStarting)
+    http.HandleFunc("/create/onServer", postOnServer)
+    http.HandleFunc("/create/onInterne", postOnInterne)
+    http.HandleFunc("/create/ending", postEnding)
 
-    http.HandleFunc("/onServer", postOnServer)
 
-    http.HandleFunc("/onInterne", postOnInterne)
 
-    http.HandleFunc("/ending", postEnding)
+//    http.HandleFunc("/create/starting", postCreateStarting)
+//    http.HandleFunc("/create/onServer", postCreateOnServer)
+//    http.HandleFunc("/create/onInterne", postCreateOnInterne)
+//    http.HandleFunc("/create/ending", postCreateEnding)
+//
+//    http.HandleFunc("/update/starting", postUpdateStarting)
+//    http.HandleFunc("/update/onServer", postUpdateOnServer)
+//    http.HandleFunc("/update/onInterne", postUpdateOnInterne)
+//    http.HandleFunc("/update/ending", postUpdateEnding)
+//
+//    http.HandleFunc("/delete/starting", postDeleteStarting)
+//    http.HandleFunc("/delete/onServer", postDeleteOnServer)
+//    http.HandleFunc("/delete/onInterne", postDeleteOnInterne)
+//    http.HandleFunc("/delete/ending", postDeleteEnding)
 
     err := http.ListenAndServe(":8080", nil)
 
@@ -342,4 +356,55 @@ func postEnding(w http.ResponseWriter, r *http.Request) {
 
     fmt.Println("========================================")
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
