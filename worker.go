@@ -84,55 +84,44 @@ type HttpOut struct {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//  200  = next                                                         //
+//  302  = next to '...' step or/and next in '...' interval of seconds  //
+//  420  = cancelled                                                    //
+//  520  = problem                                                      //
+// other = error ( 5XX : auto-retry )                                   //
+//______________________________________________________________________//
+
 // Response http from each API response
 type HttpResponse struct {
     Buffer      *JsonB
-    Interval    int
-    Comment     string
-    Step        string
+    Interval    *int
+    Step        *string
+    Comment     *string
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-    //  200  = next                                                         //
-    //  302  = next to '...' step or/and next in '...' interval of seconds  //
-    //  420  = cancelled                                                    //
-    //  520  = problem                                                      //
-    // other = error ( 5XX : auto-retry )                                   //
-    //______________________________________________________________________//
-
-
 
 func (w Worker) Action(task Task) error {
 
-
-
-
-
-
     // Little sleeper for best test works
     time.Sleep( time.Second )
-
-
-
-
-
 
     // vars
     var ending = false
@@ -141,11 +130,9 @@ func (w Worker) Action(task Task) error {
     task.Status = "doing"
     //task.LastUpdate = time.Now()
 
-
-    log.Println( "==============================================================" )
+    log.Println(" --=-=-=-=-=-=-=-=-=-=-=------------=-=-=-=-=-=-=-=-=-=-=-=-=--")
     log.Println( task )
-    log.Println( "==============================================================" )
-
+    log.Println(" --=-=-=-=-=-=-=-=-=-=-=------------=-=-=-=-=-=-=-=-=-=-=-=-=--")
 
     // exception for ending steps
     if task.Step == "ending" {
@@ -157,7 +144,7 @@ func (w Worker) Action(task Task) error {
     res, err := w.connector.Update(&task)
 
     if err != nil {
-        log.Fatalln("Error while updating the task for status lock", err)
+        log.Fatalln("Error while updating the task for status lock : ", err)
     }
 
     if res != 1 {
@@ -202,13 +189,25 @@ func (w Worker) Action(task Task) error {
     // Do the http call to retrieve API data/informations
     httpResponse, statusCode, err := w.CallHttp(task, stepData)
 
+
+//    log.Println("httpResponse : ")
+//    log.Println( httpResponse )
+//    log.Println("statusCode : ")
+//    log.Println( statusCode )
+//    log.Println("err : ")
+//    log.Println( err )
+
     if err != nil {
+
+        // XXX : need to re-read this part, maybe badly write
         log.Fatalln("Error while do the http call", err)
+
+        var comment = "Error while doing the http call"
 
         // No http response, we "emulate" a 500 error with a fake http response
         httpResponse = HttpResponse{
             Buffer: &task.Buffer,
-            Comment: "Error while doing the http call" }
+            Comment: &comment }
 
         statusCode = 500
     }
@@ -226,13 +225,13 @@ func (w Worker) Action(task Task) error {
                 log.Fatalln("Error while retrieve the next step")
             }
 
-
-
-
-
-
-
-
+//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//  200  = next                                                         //
+//  302  = next to '...' step or/and next in '...' interval of seconds  //
+//  420  = cancelled                                                    //
+//  520  = problem                                                      //
+// other = error ( 5XX : auto-retry )                                   //
+//______________________________________________________________________//
 
             // Update the task informations
             task.Status = "todo"
@@ -244,122 +243,86 @@ func (w Worker) Action(task Task) error {
 
 
 
+        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+        //  301  = next to '...' step or/and next in '...' interval of seconds  //
+        //______________________________________________________________________//
+        case 301:
 
-        // 302 = next to '...' step or/and next in '...' interval of seconds
-        case 302:
+            var founded = false
 
-////            var changed = false
-////
-////            // Need change to an other step
-////            if httpResponse.Step {
-////                // Overwrite the next step
-////                task.Step = httpResponse.Step
-////                changed = true
-////            }
-////
-////            // Need change the interval
-////            if httpResponse.Interval {
-////                // Overwrite the todo date
-//////                task.TodoDate = time.Now() + httpResponse.Interval * time.Second
-////                changed = true
-////            }
-////
-////            // Something changed ?
-////            if !changed {
-////                // XXX : what we do if no changes need to do
-////                // / XXX
-////            }
-////
-////
-////
-////
-////
-////
-////
-////
-////
-////
-////
-////            task.Status = "todo"
-////            task.Step = nextStep.Name
-//            task.Buffer = httpResponse.Buffer
-////            task.LastUpdate = time.Now()
-//
-//
-//            // retrieve the next step informations
-//            nextStep := w.Steps[ stepId + 1 ]
-//
-//            if nextStep.ID == 0 {
-//                log.Fatalln("Imposisble to found the next step")
-//            }
-//
-//            // Decoding the return buffer informations
-//            var dataJson JsonB
-//
-//            err = json.Unmarshal(body, &dataJson)
-//            //err := json.Unmarshal([]byte(n.Extra), &notification)
-//
-//            if err != nil {
-//                fmt.Println("error:",err)
-//            }
-//
-//            // Update the task informations
-//            task.Status = "todo"
-//            task.Step = nextStep.Name
-//            task.Buffer = dataJson
-//            // task.LastUpdate = time.Now()
-//
-//            // Do request on the database
-//            res, err = w.connector.Update(&task)
-//
-//            if err != nil {
-//                log.Fatalln("update fialed", err)
-//            }
-//
-//            log.Println("Rows updated:", res)
-//
-//            return nil
+            // An interval is setup to TTL the next execution
+            if httpResponse.Interval != nil {
+
+                var newInterval = *httpResponse.Interval // in seconds
+
+                if newInterval <= 0 {
+                    log.Println("Interval not founded")
+                } else {
+                    var todoDateData = *task.TodoDate
+                    log.Println("TodoDate : " + todoDateData.String() )
+                    log.Println("Interval founded : " + strconv.Itoa( newInterval ) )
+                    var newTodoDate = todoDateData.Add( time.Duration( newInterval ) * time.Second )
+                    log.Println("New interval computed : " + newTodoDate.String() )
+                    task.TodoDate = &newTodoDate
+                    log.Println("The todoDate updated to : '" + newTodoDate.String() + "' with interval '" + strconv.Itoa( newInterval ) + "'")
+                    founded = true
+                }
+            }
+
+            // A new next step definition
+            if httpResponse.Step != nil {
+
+                var askedStep = *httpResponse.Step
+
+                // flag founded
+                var stepFounded = false
+
+                // loop on each loaded steps data
+                for _, s := range w.Steps {
+                    // found the asked overwritted step
+                    if s.Name == askedStep {
+                        stepFounded = true
+                    }
+                }
+
+                if stepFounded {
+                    log.Println("Asked step founded : '" + askedStep + "'")
+                    founded = true
+                } else {
+                    log.Println("Asked step error : '" + askedStep + "'")
+                }
+            }
+
+            // Update the status data
+            if founded {
+                task.Status = "todo"
+            } else {
+                task.Status = "error"
+            }
 
 
-        // 420 = cancelled
+
+
+
+        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+        //  420  = cancelled                                                    //
+        //______________________________________________________________________//
         case 420:
 
+            // A comment was setup ???
+            if httpResponse.Comment != nil {
 
-            // 200 ok,
+                var comment = *httpResponse.Comment // string
 
-            // retrieve the next step informations
-            nextStep := w.Steps[ stepId + 1 ]
-
-            if nextStep.ID == 0 {
-                log.Fatalln("Imposisble to found the next step")
+                if comment != "" {
+                    task.Comment = comment
+                }
             }
 
-            // Decoding the return buffer informations
-            var dataJson JsonB
+            // Setup the status
+            task.Status = "cancelled"
 
-//            err = json.Unmarshal(body, &dataJson)
-//            //err := json.Unmarshal([]byte(n.Extra), &notification)
-//
-//            if err != nil {
-//                fmt.Println("error:",err)
-//            }
 
-            // Update the task informations
-            task.Status = "todo"
-            task.Step = nextStep.Name
-            task.Buffer = dataJson
-            // task.LastUpdate = time.Now()
-
-            // Do request on the database
-            res, err = w.connector.Update(&task)
-
-            if err != nil {
-                log.Fatalln("update fialed", err)
-            }
-
-            log.Println("Rows updated:", res)
-
-            return nil
 
 
         // 520 = problem
@@ -421,17 +384,12 @@ func (w Worker) Action(task Task) error {
 
     }
 
+    // Update the last update date
+    var timeNow = time.Now()
+    task.LastUpdate = &timeNow
 
-
-//
-//    // Update the task informations
-//    task.Buffer = *httpResponse.Buffer
-//    task.Retry = task.Retry - 1
-////    task.LastUpdate = time.Now()
-//
-
-
-
+    // Update the retry counter
+    task.Retry = task.Retry - 1
 
     // Do request on the database
     num, err := w.connector.Update(&task)
@@ -563,6 +521,7 @@ func (w Worker) CallHttp(task Task, step DispatcherStep) ( httpResponse HttpResp
     log.Println("===============================")
     log.Printf("Post data request was '%s'\n", string(jsonValue) )
     log.Println("Response Status:", resp.Status)
+    log.Println("Response StatusCode:", resp.StatusCode)
     log.Println("Response Headers:", resp.Header)
     log.Println("Response Body:", string(body))
     log.Println("-------------------------------")
@@ -575,6 +534,9 @@ func (w Worker) CallHttp(task Task, step DispatcherStep) ( httpResponse HttpResp
 
         return httpResponse, statusCode, err
     }
+
+    // Retrieve the statusCode data
+    statusCode = resp.StatusCode
 
     log.Println("Http call work fine")
 

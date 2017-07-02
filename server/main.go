@@ -8,31 +8,237 @@ import (
     "encoding/json"
 )
 
+type StepInDataStruct struct {
+    Name        string
+    Arguments   JsonB
+    Buffer      JsonB
+}
+
+type StepOutDataStruct struct {
+    Buffer      *JsonB
+    Interval    *int
+    Step        *string
+    Comment     *string
+}
+
+func postHandler(w http.ResponseWriter, r *http.Request) {
+
+    // Setup the response header
+    w.Header().Set("Content-Type", "application/json")
+
+    fmt.Println("========================================")
+
+    fmt.Println("----------- Request received -----------")
+
+    if r.Method != "POST" {
+
+        w.WriteHeader(http.StatusMethodNotAllowed)
+
+        return
+    }
+
+    fmt.Println("------------- Request post -------------")
+
+    // Read data from body request
+    var body = &StepInDataStruct{}
+
+    // Decode body json data
+    err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&body)
+
+    if err != nil {
+
+        fmt.Errorf("an error occured while deserializing message")
+
+        w.WriteHeader(http.StatusBadRequest)
+
+        fmt.Println("========================================")
+
+        return
+    }
+
+    fmt.Println("------------- Body decoded -------------")
+
+    // Show the request body data
+    fmt.Println( body )
+
+    fmt.Println("------------- Action begin -------------")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//    //  301  = next to '...' step or/and next in '...' interval of seconds  //
+//    //______________________________________________________________________//
+//    w.WriteHeader(http.StatusMovedPermanently)
+//
+//    var interval = 24 * 60 * 60 // 1 day
+//    var step = "starting"
+//    var buffer = body.Buffer
+//
+//    buffer["steps"] = []string{"starting"}
+//
+//    var stepOutData = &StepOutDataStruct{
+//        Buffer: &buffer,
+//        Interval: &interval,
+//        Step: &step }
+
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    //  420  = cancelled                                                    //
+    //______________________________________________________________________//
+    w.WriteHeader(420)
+
+    var comment = "commentaire from api"
+    var buffer = body.Buffer
+
+    buffer["steps"] = []string{"starting"}
+
+    var stepOutData = &StepOutDataStruct{
+        Buffer: &buffer,
+        Comment: &comment }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    fmt.Println("------------- Action done --------------")
+
+    // Re-encode the response
+    js, err := json.Marshal( stepOutData )
+
+    if err != nil {
+
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+
+        fmt.Println("========================================")
+
+        return
+    }
+
+    fmt.Println("------------- Send response ------------")
+
+    // Write the json response
+    w.Write(js)
+
+    fmt.Println("========================================")
+}
+
+// ================================================= //
+// ================================================= //
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 func main() {
 
     fmt.Println("starting server http")
 
-    http.HandleFunc("/create/starting", postStarting)
-    http.HandleFunc("/create/onServer", postOnServer)
-    http.HandleFunc("/create/onInterne", postOnInterne)
-    http.HandleFunc("/create/ending", postEnding)
+    http.HandleFunc("/starting", postStarting)
+    http.HandleFunc("/onServer", postOnServer)
+    http.HandleFunc("/onInterne", postOnInterne)
+    http.HandleFunc("/ending", postEnding)
 
+    http.HandleFunc("/create/starting", postHandler)
+    http.HandleFunc("/create/onServer", postHandler)
+    http.HandleFunc("/create/onInterne", postHandler)
+    http.HandleFunc("/create/ending", postHandler)
 
+    http.HandleFunc("/update/starting", postHandler)
+    http.HandleFunc("/update/onServer", postHandler)
+    http.HandleFunc("/update/onInterne", postHandler)
+    http.HandleFunc("/update/ending", postHandler)
 
-//    http.HandleFunc("/create/starting", postCreateStarting)
-//    http.HandleFunc("/create/onServer", postCreateOnServer)
-//    http.HandleFunc("/create/onInterne", postCreateOnInterne)
-//    http.HandleFunc("/create/ending", postCreateEnding)
-//
-//    http.HandleFunc("/update/starting", postUpdateStarting)
-//    http.HandleFunc("/update/onServer", postUpdateOnServer)
-//    http.HandleFunc("/update/onInterne", postUpdateOnInterne)
-//    http.HandleFunc("/update/ending", postUpdateEnding)
-//
-//    http.HandleFunc("/delete/starting", postDeleteStarting)
-//    http.HandleFunc("/delete/onServer", postDeleteOnServer)
-//    http.HandleFunc("/delete/onInterne", postDeleteOnInterne)
-//    http.HandleFunc("/delete/ending", postDeleteEnding)
+    http.HandleFunc("/delete/starting", postHandler)
+    http.HandleFunc("/delete/onServer", postHandler)
+    http.HandleFunc("/delete/onInterne", postHandler)
+    http.HandleFunc("/delete/ending", postHandler)
 
     err := http.ListenAndServe(":8080", nil)
 
@@ -356,55 +562,3 @@ func postEnding(w http.ResponseWriter, r *http.Request) {
 
     fmt.Println("========================================")
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

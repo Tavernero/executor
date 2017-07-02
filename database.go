@@ -9,6 +9,27 @@ import (
     "github.com/lib/pq"
 )
 
+
+// read one task from the database
+func (d *Dispatcher) readOne(id int64) (task Task, err error) {
+
+    log.Println("Read one task")
+
+    // retrieve all task
+    _, err = d.connector.Select(
+        &task,
+        "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() order by id asc",
+        map[string]interface{}{"status":"todo","function":d.Configuration.Function,"id":id} )
+
+    if err != nil {
+        log.Fatalln("Select failed", err)
+        return task, err
+    }
+
+    return task, nil
+}
+
+
 // read all tasks from the database
 func (d *Dispatcher) firstRead() {
 
@@ -19,8 +40,8 @@ func (d *Dispatcher) firstRead() {
 
     _, err := d.connector.Select(
         &tasks,
-        "select * from task where status = :status order by id asc",
-        map[string]interface{}{"status":"todo"} )
+        "select * from task where status = :status and function = :function and retry > 0 and todo_date <= now() order by id asc",
+        map[string]interface{}{"status":"todo","function":d.Configuration.Function} )
 
     if err != nil {
         log.Fatalln("Select failed", err)
@@ -86,20 +107,6 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                     fmt.Println("error:",err)
                 }
 
-                // no deleted rows
-                // XXX : maybe no listen deleted rows in trigger
-                if notification.Action == "DELETE" {
-                    return
-                }
-                // / XXX
-
-                var task = notification.Task
-
-                // no work on no todo tasks
-                if task.Status != "todo" {
-                    return
-                }
-
                 fmt.Println("Received data from channel [", n.Channel, "] :")
 
                 fmt.Printf("%+v \n", notification)
@@ -118,25 +125,7 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                     l.Ping()
                 }()
 
-                // retrieve all task
-                var tasks []Task
-
-                _, err := d.connector.Select(
-                    &tasks,
-                    "select * from task where status = :status order by id asc",
-                    map[string]interface{}{"status":"todo"} )
-
-                if err != nil {
-                    log.Fatalln("Select failed", err)
-                }
-
-                log.Println("All rows:")
-
-                for x, task := range tasks {
-                    d.TaskQueue <- task
-
-                    log.Printf("  %d : %v\n", x, task)
-                }
+                go d.firstRead()
 
                 return
         }

@@ -62,8 +62,9 @@ func initDb() *gorp.DbMap {
         log.Fatalln("sql.Open failed ...", err )
         panic(err)
     }
-    dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
 
+
+    dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
 
 
     // add a table, setting the table name to 'task' and
