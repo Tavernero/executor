@@ -1,6 +1,7 @@
 package main
 
 import (
+    "os"
     "log"
     "database/sql"
     "gopkg.in/gorp.v2"
@@ -24,14 +25,27 @@ type Configuration struct {
     MaxQueue int // the queue length to treat from database
 }
 
-// Step dispatcher object
-type DispatcherStep struct {
-    ID int
-    Function string
-    Index int
-    Name string
-    Url string
+
+func initDb() *gorp.DbMap {
+    db, err := sql.Open("postgres", ConnectionConfiguration)
+    if err != nil {
+        log.Fatalln("sql.Open failed ...", err )
+        panic(err)
+    }
+
+    dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
+
+    // Will log all SQL statements + args as they are run
+    // The first arg is a string prefix to prepend to all log messages
+    dbmap.TraceOn("[gorp]", log.New(os.Stdout, "myapp:", log.Lmicroseconds))
+
+    // add a table, setting the table name to 'task' and
+    // specifying that the Id property is an auto incrementing PK
+    dbmap.AddTableWithName(Task{}, "task").SetKeys(true, "ID")
+
+    return dbmap
 }
+
 
 // ================================================= //
 // ================================================= //
@@ -54,26 +68,9 @@ type DispatcherStep struct {
 //        user, pass, protocol, host, port, dbname, dbargs)
 //}
 
-var dbmap = initDb()
-
-func initDb() *gorp.DbMap {
-    db, err := sql.Open("postgres", ConnectionConfiguration)
-    if err != nil {
-        log.Fatalln("sql.Open failed ...", err )
-        panic(err)
-    }
-
-
-    dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
-
-
-    // add a table, setting the table name to 'task' and
-    // specifying that the Id property is an auto incrementing PK
-    dbmap.AddTableWithName(Task{}, "task").SetKeys(true, "ID")
-
-
-
-
+//
+//
+//
 //        // construct a gorp DbMap setting dialect to sqlite3
 //        dbmap := &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 //        defer dbmap.Db.Close()
@@ -95,28 +92,3 @@ func initDb() *gorp.DbMap {
 //        })
 //        var car *Car
 //        dbmap.Get(car, id)
-
-
-
-    return dbmap
-}
-
-// Configuration for a specific task to work
-//type ConfigurationTask struct {
-//    ID int `db:"id, primarykey" json:"id"`
-//    Function string `db:"function" json:"function"`
-//    Status string `db:"status" json:"status"`
-//    Properties PropertyMap `db:"properties" json:"properties"`
-//}
-//
-//create table "task_configuration" (
-//    "id" bigserial primary key,
-//    "function" character varying(255) not null,
-//    "status" character varying(255) not null,
-//    "properties" jsonb not null default '{}'
-//);
-//
-//insert into "task_configuration" ( "function", "status", "properties" ) values
-//( 'web/create', 'available', '{"sequence":[
-//        {"step":"starting","url":"https://api.com/starting"},
-//        {"step":"ending","url":"https://api.com/ending"}]}' );

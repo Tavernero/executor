@@ -70,38 +70,47 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 
 
-
-
-
-
-
+//    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//    //  200  = next                                                         //
+//    //______________________________________________________________________//
+//
+//    var buffer = body.Buffer
+//
+//    buffer["steps"] = []string{ r.URL.String() }
+//
+//    var stepOutData = &StepOutDataStruct{
+//        Buffer: &buffer }
+//
 
 
 //    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
 //    //  301  = next to '...' step or/and next in '...' interval of seconds  //
 //    //______________________________________________________________________//
+//
 //    w.WriteHeader(http.StatusMovedPermanently)
 //
 //    var interval = 24 * 60 * 60 // 1 day
-//    var step = "starting"
+//    var step = "ending"
 //    var buffer = body.Buffer
 //
-//    buffer["steps"] = []string{"starting"}
+//    buffer["steps"] = []string{ r.URL.String() }
 //
 //    var stepOutData = &StepOutDataStruct{
 //        Buffer: &buffer,
 //        Interval: &interval,
 //        Step: &step }
 
+
     //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
     //  420  = cancelled                                                    //
     //______________________________________________________________________//
+
     w.WriteHeader(420)
 
     var comment = "commentaire from api"
     var buffer = body.Buffer
 
-    buffer["steps"] = []string{"starting"}
+    buffer["steps"] = []string{ r.URL.String() }
 
     var stepOutData = &StepOutDataStruct{
         Buffer: &buffer,

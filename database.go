@@ -1,7 +1,6 @@
 package main
 
 import (
-    "fmt"
     "log"
     "time"
     "encoding/json"
@@ -9,38 +8,29 @@ import (
     "github.com/lib/pq"
 )
 
+func (d *Dispatcher) readSteps() {
 
-// read one task from the database
-func (w *Worker) readOne(id int64) (task Task, err error) {
+    log.Println("Get the dispatcher definition")
 
-    log.Println("Read one task")
-
-    // retrieve all task
-    _, err = w.connector.Select(
-        &task,
-        "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() order by id asc",
-        map[string]interface{}{"status":"todo","function":w.Function,"id":id} )
+    err := d.connector.SelectOne(
+        &d.Definition,
+        "select * from definition where function = :function",
+        map[string]interface{}{"function":d.Configuration.Function} )
 
     if err != nil {
         log.Fatalln("Select failed", err)
-        return task, err
     }
-
-    return task, nil
 }
 
+func (d *Dispatcher) readTaskIds() {
 
-// read all tasks from the database
-func (d *Dispatcher) firstRead() {
+    log.Println("Read all task IDs")
 
-    log.Println("Read the first batch")
-
-    // retrieve all task
-    var tasks []Task
+    var taskIds []int64
 
     _, err := d.connector.Select(
-        &tasks,
-        "select * from task where status = :status and function = :function and retry > 0 and todo_date <= now() order by id asc",
+        &taskIds,
+        "select id from task where status = :status and function = :function and retry > 0 and todo_date <= now() order by id asc",
         map[string]interface{}{"status":"todo","function":d.Configuration.Function} )
 
     if err != nil {
@@ -49,16 +39,15 @@ func (d *Dispatcher) firstRead() {
 
     log.Println("All rows:")
 
-    for x, task := range tasks {
+    for x, id := range taskIds {
 
-        d.TaskQueue <- task
+        d.IdQueue <- id
 
-        log.Printf("  %d : %v\n", x, task)
+        log.Printf("  %d : %v\n", x, id)
     }
 }
 
-// prepare the listener data and launch it
-func (d *Dispatcher) initializeListenerAndLaunch() {
+func (d *Dispatcher) initializeListenerAndListen() {
 
     _, err := sql.Open("postgres", ConnectionConfiguration)
 
@@ -68,33 +57,33 @@ func (d *Dispatcher) initializeListenerAndLaunch() {
 
     reportProblem := func(ev pq.ListenerEventType, err error) {
         if err != nil {
-            fmt.Println(err.Error())
+            log.Println(err.Error())
         }
     }
 
     listener := pq.NewListener(ConnectionConfiguration, 10*time.Second, time.Minute, reportProblem)
 
-    err = listener.Listen("events_task")
+    err = listener.Listen("events_task_" + d.Configuration.Function)
 
     if err != nil {
         panic(err)
     }
 
-    fmt.Println("Start monitoring PostgreSQL...")
+    log.Println("Start monitoring PostgreSQL...")
 
     for {
-        d.waitForNotificationFromListener(listener)
+        d.waitForNotification(listener)
     }
 }
 
 type DatabaseNotification struct {
-    Table   string
-    Action  string
-    Task    Task
+    Table       string
+    Action      string
+    Function    string
+    ID          int64
 }
 
-// listening to the event bus of the database and do some actions
-func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
+func (d *Dispatcher) waitForNotification(l *pq.Listener) {
     for {
         select {
             case n := <-l.Notify:
@@ -104,30 +93,43 @@ func (d *Dispatcher) waitForNotificationFromListener(l *pq.Listener) {
                 err := json.Unmarshal([]byte(n.Extra), &notification)
 
                 if err != nil {
-                    fmt.Println("error:",err)
+                    log.Println("error:",err)
                 }
 
-                fmt.Println("Received data from channel [", n.Channel, "] :")
+                log.Println("Received data from channel [", n.Channel, "] :")
 
-                fmt.Printf("%+v \n", notification)
+                log.Printf("%+v \n", notification)
 
-                d.TaskQueue <- notification.Task
+                d.IdQueue <- notification.ID
 
-                fmt.Println("Data send in task queue")
-
-                return
+                log.Println("Data send in task queue")
 
             case <-time.After(90 * time.Second):
 
-                fmt.Println("Received no events for 90 seconds, checking connection")
+                log.Println("Received no events for 90 seconds, checking connection")
 
-                go func() {
-                    l.Ping()
-                }()
+                go l.Ping()
 
-                go d.firstRead()
+                log.Println("Retreieve ids")
 
-                return
+                go d.readTaskIds()
         }
     }
 }
+
+func (w *Worker) readOneTask(id int64) (task Task, err error) {
+
+    log.Println("Read one task")
+
+    err = w.connector.SelectOne(
+        &task,
+        "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() limit 1",
+        map[string]interface{}{"status":"todo","function":w.Function,"id":id} )
+
+    if err != nil {
+        log.Fatalln("Select failed", err)
+    }
+
+    return task, err
+}
+

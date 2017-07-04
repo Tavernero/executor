@@ -1,7 +1,6 @@
 package main
 
 import (
-    "fmt"
     "log"
     "strconv"
     "gopkg.in/gorp.v2"
@@ -10,23 +9,23 @@ import (
 
 // Dispatcher object
 type Dispatcher struct {
+    Definition      Definition
     Configuration   Configuration
-    WorkerPool      chan chan Task
-    TaskQueue       chan Task
+    WorkerPool      chan chan int64
+    IdQueue         chan int64
 
-    quit            chan bool
-    Steps           []DispatcherStep
     connector       *gorp.DbMap
+    quit            chan bool
 }
 
 // Create a new dispatcher
-func NewDispatcher(conf Configuration) *Dispatcher {
-    pool := make(chan chan Task, conf.MaxWorkers)
-    queue := make(chan Task, conf.MaxQueue)
+func NewDispatcher(configuration Configuration) *Dispatcher {
+    pool := make(chan chan int64, configuration.MaxWorkers)
+    queue := make(chan int64, configuration.MaxQueue)
     return &Dispatcher{
+        Configuration: configuration,
         WorkerPool: pool,
-        TaskQueue: queue,
-        Configuration: conf }
+        IdQueue: queue }
 }
 
 // Launch the dispatcher process
@@ -36,35 +35,20 @@ func (d *Dispatcher) Run() {
     d.connector = initDb()
     // XXX : defer d.connector.Db.Close()
 
-    // retrieving steps from db
-    _, err := d.connector.Select(
-        &d.Steps,
-        "select * from task_step where function = :function order by index asc",
-        map[string]interface{}{"function":d.Configuration.Function} )
-
-    if err != nil {
-        log.Fatalln("Select failed", err)
-    }
-
-    log.Println("All task steps :")
-
-    for x, p := range d.Steps {
-        log.Printf("  %d  :  %v", x, p)
-    }
-
-    log.Println("===============")
+    // retrieve the steps for this function
+    d.readSteps()
 
     // starting n number of workers
     for i := 0; i < d.Configuration.MaxWorkers; i++ {
-        worker := NewWorker(d.Configuration.Function,d.WorkerPool,d.Steps)
+        worker := NewWorker(d.Configuration.Function,d.WorkerPool,d.Definition)
         worker.Start()
     }
 
     // launch a first read on database data task
-    go d.firstRead()
+    go d.readTaskIds()
 
     // launch the listener for database events
-    go d.initializeListenerAndLaunch()
+    go d.initializeListenerAndListen()
 
     // launch the dispatch
     d.dispatch()
@@ -72,31 +56,26 @@ func (d *Dispatcher) Run() {
 
 // Dispatch each task to a free worker
 func (d *Dispatcher) dispatch() {
-    fmt.Println("Worker queue dispatcher started...")
+
+    log.Println("Worker queue dispatcher started...")
+
     for {
         select {
-            case task := <-d.TaskQueue:
+            case taskId := <-d.IdQueue:
 
-                log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa( int(task.ID) ) )
-
-//                // a task request has been receive
-//                go func(task Task) {
+                log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa( int(taskId) ) )
 
                 // try to obtain a worker task channel that is available.
                 // this will block until a worker is idle
                 taskChannel := <-d.WorkerPool
 
                 // dispatch the task to the worker task channel
-                taskChannel <- task
-
-//                }(task)
+                taskChannel <- taskId
 
             case <-d.quit:
                 // we have received a signal to stop
 
                 // XXX : how to stop workers correctly
-
-                return
         }
     }
 }

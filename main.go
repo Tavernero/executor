@@ -4,9 +4,6 @@ import (
     "log"
 )
 
-// XXX : how to defer close db connections
-// XXX : getoption lib == https://golang.org/pkg/flag/
-
 func main() {
 
     log.Println("Main start")
