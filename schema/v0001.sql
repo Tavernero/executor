@@ -2,6 +2,7 @@
 --+Migrate Down
 
 drop table if exists "robot";
+drop table if exists "endpoint";
 drop table if exists "task";
 
 --+Migrate Up
@@ -23,6 +24,17 @@ create table "task" (
     "comment" character varying(255)
 );
 
+create table "endpoint" (
+    "id" uuid primary key default gen_random_uuid(),
+    "version" bigint not null,
+    "name" character varying(255) not null,
+    "method" character varying(255) not null,
+    "url" character varying(255) not null,
+    "creation_date" timestamp with time zone not null default now(),
+    "last_update" timestamp with time zone not null default now(),
+    constraint "endpoint_unique_name" unique("name")
+);
+
 create table "robot" (
     "id" uuid primary key default gen_random_uuid(),
     "function" character varying(255) not null,
@@ -32,5 +44,4 @@ create table "robot" (
     "creation_date" timestamp with time zone not null default now(),
     "last_update" timestamp with time zone not null default now()
 );
-
 
