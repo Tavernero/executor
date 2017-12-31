@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-    "time"
+	"time"
 
 	"github.com/go-pg/pg"
 	"github.com/m49n3t0/executor/models"
@@ -143,7 +143,7 @@ func (dispatcher *Dispatcher) GetRobotConfiguration() error {
 	// store the endpoint to fetch informations
 	var stepIDs []string
 
-    // store into dispatcher definitions data
+	// store into dispatcher definitions data
 	for _, robot := range robots {
 
 		// remap by version the definitions
@@ -259,17 +259,17 @@ func (dispatcher *Dispatcher) UpdateTask(task *models.Task) error {
 	task.LastUpdate = time.Now()
 
 	// update the database object
-    _, err := dispatcher.DB.
-        Model(task).
-        Column(
-            models.ColTask_Status,
-            models.ColTask_Step,
-            models.ColTask_Retry,
-            models.ColTask_TodoDate,
-            models.ColTask_Buffer,
-            models.ColTask_Comment,
-        ).
-        Update()
+	_, err := dispatcher.DB.
+		Model(task).
+		Column(
+			models.ColTask_Status,
+			models.ColTask_Step,
+			models.ColTask_Retry,
+			models.ColTask_TodoDate,
+			models.ColTask_Buffer,
+			models.ColTask_Comment,
+		).
+		Update()
 
 	if err != nil {
 		log.Printf("Error while updating the task result : %s", err)
@@ -280,5 +280,3 @@ func (dispatcher *Dispatcher) UpdateTask(task *models.Task) error {
 
 	return nil
 }
-
-
