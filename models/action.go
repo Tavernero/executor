@@ -36,6 +36,7 @@ func (e Action) Value() (driver.Value, error) {
 
 const (
 	Action_NULL       Action = ""
+	Action_DONE       Action = "DONE"
 	Action_GOTO       Action = "GOTO"
 	Action_NEXT       Action = "NEXT"
 	Action_GOTO_LATER Action = "GOTO_LATER"

@@ -187,6 +187,10 @@ func (worker *Worker) DoAction(log *logrus.Entry, task *models.Task) error {
 	// do the action correctly
 	switch response.Action {
 
+	// DONE action
+	case models.Action_DONE:
+		return worker.ActionDone(log, task, definition, response)
+
 	// GOTO action
 	case models.Action_GOTO:
 		return worker.ActionGoto(log, task, definition, response)
@@ -312,6 +316,24 @@ func (worker Worker) CallHttp(log *logrus.Entry, task *models.Task, endpoint *mo
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+// Function to process the DONE action
+func (worker *Worker) ActionDone(log *logrus.Entry, task *models.Task, definition *models.Definition, response *models.ApiResponse) error {
+
+	// status DONE
+	task.Status = models.TaskStatus_DONE
+
+	// get the now time
+	now := time.Now()
+
+	// defined the done date
+	task.DoneDate = &now
+
+	// logger
+	log.Info("Task finished")
+
+	return nil
+}
 
 // Function to process the GOTO_LATER action
 func (worker *Worker) ActionGotoLater(log *logrus.Entry, task *models.Task, definition *models.Definition, response *models.ApiResponse) error {
@@ -597,6 +619,7 @@ func (worker *Worker) UpdateTask(task *models.Task) error {
 			models.ColTask_Step,
 			models.ColTask_Retry,
 			models.ColTask_TodoDate,
+			models.ColTask_DoneDate,
 			models.ColTask_Buffer,
 			models.ColTask_Comment,
 		).
