@@ -169,8 +169,9 @@ func Run(machine Machine, function string) {
 
 // Label for logger fields
 var (
-	LABEL_WORKER_ID string = "worker_id"
-	LABEL_TASK_ID   string = "task_id"
-	LABEL_STEP      string = "step"
-	LABEL_FUNCTION  string = "function"
+	LABEL_WORKER_ID      string = "worker_id"
+	LABEL_TASK_ID        string = "task_id"
+	LABEL_STEP           string = "step"
+	LABEL_FUNCTION       string = "function"
+	LABEL_HTTP_CALL_TIME string = "http_call_ms"
 )

@@ -107,7 +107,7 @@ func (worker *Worker) ExecuteProcess(logger *logrus.Entry, ID string) {
 		WithField(LABEL_STEP, task.Step)
 
 	// logger
-	log.Infof("Working on task '%s'", task.ID)
+	log.Infof("Working on step '%s' of task '%s' ", task.Step, task.ID)
 
 	// defined status to DOING
 	task.Status = models.TaskStatus_DOING
@@ -119,8 +119,6 @@ func (worker *Worker) ExecuteProcess(logger *logrus.Entry, ID string) {
 	}
 
 	log.Info("Task status updated in 'DOING'")
-
-	// --------------------------------------------------------------------- //
 
 	// do the action like into a transaction
 	if err := worker.DoAction(log, task); err != nil {
@@ -224,6 +222,7 @@ func (worker *Worker) DoAction(log *logrus.Entry, task *models.Task) error {
 	// ERROR action
 	case models.Action_ERROR:
 		return worker.ActionError(log, task, definition, response)
+
 	}
 
 	// action not matched
@@ -280,18 +279,20 @@ func (worker Worker) CallHttp(log *logrus.Entry, task *models.Task, endpoint *mo
 	// elapsed timer
 	elapsed := time.Since(start).Seconds()
 
-	log.Debugf("Time of request execution : '%f' seconds", elapsed)
+	log.WithField(LABEL_HTTP_CALL_TIME, elapsed).Infof("Time of request execution : '%f' seconds", elapsed)
 
 	// check the API return
 	if response.Body == nil {
 		return nil, errors.New("The API doesn't return the good structure")
 	}
 
-	//	// XXX: need to check http status code
-	//	r.StatusCode = resp.StatusCode
-
 	// defer the closing of the body data
 	defer response.Body.Close()
+
+	// Error on the response return
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.New("The HTTP call failed")
+	}
 
 	// read the HTTP body
 	body, err := ioutil.ReadAll(response.Body)
@@ -299,21 +300,15 @@ func (worker Worker) CallHttp(log *logrus.Entry, task *models.Task, endpoint *mo
 		return nil, err
 	}
 
-	//	r.Body = string(bb)
-	//
-	//	bodyJSONArray := []interface{}{}
-	//	if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
-	//		bodyJSONMap := map[string]interface{}{}
-	//		if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
-	//			r.BodyJSON = bodyJSONMap
-	//		}
-	//	} else {
-	//		r.BodyJSON = bodyJSONArray
-	//	}
-	fmt.Println(body)
-	fmt.Println(elapsed)
+	// api response
+	var apiResponse = models.ApiResponse{}
 
-	return &models.ApiResponse{}, nil
+	// decapsulate the body json
+	if err := json.Unmarshal(body, &apiResponse); err != nil {
+		return nil, errors.New("Impossible to decapsulate the JSON body response")
+	}
+
+	return &apiResponse, nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -434,7 +429,7 @@ func (worker *Worker) ActionNext(log *logrus.Entry, task *models.Task, definitio
 	}
 
 	// no next step found, error
-	if !found {
+	if !found || nextStep == "" {
 		return errors.New("Impossible to found the next step")
 	}
 
