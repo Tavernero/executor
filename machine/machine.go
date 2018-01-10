@@ -2,6 +2,8 @@ package machine
 
 import (
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-pg/pg"
@@ -85,22 +87,28 @@ func (machine DefaultMachine) GetDatabase(logger *logrus.Entry) (*pg.DB, error) 
 	return db, nil
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
 // to launch the machine executor with a default struct
 func RunDefault(function string) {
 	Run(DefaultMachine{}, function)
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 // to launch the machine executor
 func Run(machine Machine, function string) {
+
+	// declare the SIGTERM signal chan
+	var signals = make(chan os.Signal, 2)
+
+	// link system signal to this run
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 
 	// create a dispatcher
 	dispatcher, err := NewDispatcher(&DispatcherParams{
 		Machine:   machine,
 		Function:  function,
 		MaxWorker: 20,
-		MaxQueue:  5,
+		MaxQueue:  30,
 	})
 
 	// deferred the database connection closes
@@ -119,9 +127,6 @@ func Run(machine Machine, function string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// listen the channel
-	go dispatcher.Signal()
 
 	// launch a first task ID listing
 	go dispatcher.GetTasks()
@@ -143,7 +148,9 @@ func Run(machine Machine, function string) {
 	log.Info("Worker dispatch started...")
 
 	for {
+
 		select {
+
 		case ID := <-dispatcher.Queue:
 
 			log.WithField(LABEL_TASK_ID, ID).Info("Dispatch task")
@@ -155,7 +162,7 @@ func Run(machine Machine, function string) {
 			// dispatch the task to the worker task channel
 			taskChannel <- ID
 
-		case <-dispatcher.Quit:
+		case <-signals:
 
 			// we have received a signal to stop
 			log.Info("Dispatch is stopping")
@@ -163,8 +170,11 @@ func Run(machine Machine, function string) {
 			// XXX : how to stop workers correctly
 
 			return
+
 		}
+
 	}
+
 }
 
 // Label for logger fields
@@ -175,3 +185,5 @@ var (
 	LABEL_FUNCTION       string = "function"
 	LABEL_HTTP_CALL_TIME string = "http_call_ms"
 )
+
+///////////////////////////////////////////////////////////////////////////////

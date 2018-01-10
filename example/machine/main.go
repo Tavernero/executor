@@ -10,7 +10,7 @@ func main() {
 
 	log.Info("Begin")
 
-    machine.RunDefault("toto_function")
+	machine.RunDefault("toto_function")
 
 	log.Info("Done")
 }

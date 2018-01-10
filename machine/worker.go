@@ -48,8 +48,7 @@ func (worker *Worker) Start() {
 	go func() {
 
 		// function logger
-		log := worker.Dispatcher.Logger.
-			WithField(LABEL_WORKER_ID, worker.ID)
+		log := worker.Dispatcher.Logger.WithField(LABEL_WORKER_ID, worker.ID)
 
 		// infinite loop
 		for {
@@ -73,6 +72,7 @@ func (worker *Worker) Start() {
 
 				// we have received a signal to stop, exit this function
 				return
+
 			}
 		}
 	}()
@@ -88,12 +88,12 @@ func (worker *Worker) Stop() {
 ///////////////////////////////////////////////////////////////////////////////
 
 // execute the action of a specific task
-func (worker *Worker) ExecuteProcess(logger *logrus.Entry, ID string) {
+func (worker *Worker) ExecuteProcess(log *logrus.Entry, ID string) {
 
 	// retrieve a task
 	task, err := worker.GetTask(ID)
 	if err != nil {
-		logger.WithError(err).Warn("Error while retrieve one task")
+		log.WithError(err).Warn("Error while retrieve one task")
 		return
 	}
 	// the task was already unusable, next work
@@ -102,9 +102,7 @@ func (worker *Worker) ExecuteProcess(logger *logrus.Entry, ID string) {
 	}
 
 	// function logger
-	log := logger.
-		WithField(LABEL_TASK_ID, task.ID).
-		WithField(LABEL_STEP, task.Step)
+	log = log.WithFields(logrus.Fields{LABEL_TASK_ID: task.ID, LABEL_STEP: task.Step})
 
 	// logger
 	log.Infof("Working on step '%s' of task '%s' ", task.Step, task.ID)
@@ -185,48 +183,8 @@ func (worker *Worker) DoAction(log *logrus.Entry, task *models.Task) error {
 	}
 
 	// do the action correctly
-	switch response.Action {
-
-	// DONE action
-	case models.Action_DONE:
-		return worker.ActionDone(log, task, definition, response)
-
-	// GOTO action
-	case models.Action_GOTO:
-		return worker.ActionGoto(log, task, definition, response)
-
-	// GOTO_LATER action
-	case models.Action_GOTO_LATER:
-		return worker.ActionGotoLater(log, task, definition, response)
-
-	// NEXT action
-	case models.Action_NEXT:
-		return worker.ActionNext(log, task, definition, response)
-
-	// NEXT_LATER action
-	case models.Action_NEXT_LATER:
-		return worker.ActionNextLater(log, task, definition, response)
-
-	// RETRY_NOW action
-	case models.Action_RETRY_NOW:
-		return worker.ActionRetryNow(log, task, definition, response)
-
-	// RETRY action
-	case models.Action_RETRY:
-		return worker.ActionRetry(log, task, definition, response)
-
-	// CANCELED action
-	case models.Action_CANCELED:
-		return worker.ActionCanceled(log, task, definition, response)
-
-	// PROBLEM action
-	case models.Action_PROBLEM:
-		return worker.ActionProblem(log, task, definition, response)
-
-	// ERROR action
-	case models.Action_ERROR:
-		return worker.ActionError(log, task, definition, response)
-
+	if fn := actions[response.Action]; fn != nil {
+		return fn(worker, log, task, definition, response)
 	}
 
 	// action not matched
@@ -317,6 +275,20 @@ func (worker Worker) CallHttp(log *logrus.Entry, task *models.Task, endpoint *mo
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Mapping possible actions to the good function
+var actions = map[models.Action]func(*Worker, *logrus.Entry, *models.Task, *models.Definition, *models.ApiResponse) error{
+	models.Action_DONE:       (*Worker).ActionDone,
+	models.Action_GOTO:       (*Worker).ActionGoto,
+	models.Action_GOTO_LATER: (*Worker).ActionGotoLater,
+	models.Action_NEXT:       (*Worker).ActionNext,
+	models.Action_NEXT_LATER: (*Worker).ActionNextLater,
+	models.Action_RETRY_NOW:  (*Worker).ActionRetryNow,
+	models.Action_RETRY:      (*Worker).ActionRetry,
+	models.Action_CANCELED:   (*Worker).ActionCanceled,
+	models.Action_PROBLEM:    (*Worker).ActionProblem,
+	models.Action_ERROR:      (*Worker).ActionError,
+}
+
 // Function to process the DONE action
 func (worker *Worker) ActionDone(log *logrus.Entry, task *models.Task, definition *models.Definition, response *models.ApiResponse) error {
 
@@ -356,7 +328,7 @@ func (worker *Worker) ActionGotoLater(log *logrus.Entry, task *models.Task, defi
 	log.Infof("TodoDate updated to '%s'", task.TodoDate) // task.TodoDate.String()
 
 	// later == retry
-	task.Retry = task.Retry - 1
+	task.Retry--
 
 	return worker.ActionGoto(log, task, definition, response)
 }
@@ -419,7 +391,7 @@ func (worker *Worker) ActionNextLater(log *logrus.Entry, task *models.Task, defi
 	log.Infof("TodoDate updated to '%s'", task.TodoDate) // task.TodoDate.String()
 
 	// later == retry
-	task.Retry = task.Retry - 1
+	task.Retry--
 
 	return worker.ActionNext(log, task, definition, response)
 }
@@ -473,7 +445,7 @@ func (worker *Worker) ActionRetryNow(log *logrus.Entry, task *models.Task, defin
 	// status T0D0
 	task.Status = models.TaskStatus_TODO
 
-	task.Retry = task.Retry - 1
+	task.Retry--
 
 	log.Info("Retry now this step")
 
@@ -500,7 +472,7 @@ func (worker *Worker) ActionRetry(log *logrus.Entry, task *models.Task, definiti
 	// not exists/defined no_decrement flag
 	if response.Data.NoDecrement == nil || *response.Data.NoDecrement != true {
 		// later == retry
-		task.Retry = task.Retry - 1
+		task.Retry--
 	}
 
 	// status T0D0
@@ -549,7 +521,7 @@ func (worker *Worker) ActionMistake(log *logrus.Entry, task *models.Task, mErr e
 	task.Comment = mErr.Error()
 
 	// always lss a retry when we do an error inside
-	task.Retry = task.Retry - 1
+	task.Retry--
 
 	// logger
 	log.WithError(mErr).Info("A mistake appear while the process")
@@ -567,7 +539,7 @@ func (worker *Worker) ActionFault(log *logrus.Entry, task *models.Task, mErr err
 	task.Comment = mErr.Error()
 
 	// always lss a retry when we do an error inside
-	task.Retry = task.Retry - 1
+	task.Retry--
 
 	// logger
 	log.WithError(mErr).Info("A disfunctional fault appear while the process")
@@ -625,11 +597,7 @@ func (worker *Worker) UpdateTask(task *models.Task) error {
 		).
 		Update()
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 ///////////////////////////////////////////////////////////////////////////////
